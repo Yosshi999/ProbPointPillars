@@ -4,6 +4,7 @@ import time
 from functools import partial
 
 import numpy as np
+from tqdm import tqdm
 
 from second.core import box_np_ops
 from second.core import preprocess as prep
@@ -305,7 +306,7 @@ def _calculate_num_points_in_gt(data_path,
                                 relative_path,
                                 remove_outside=True,
                                 num_features=4):
-    for info in infos:
+    for info in tqdm(infos, desc="calculate"):
         pc_info = info["point_cloud"]
         image_info = info["image"]
         calib = info["calib"]

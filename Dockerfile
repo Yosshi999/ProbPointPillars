@@ -21,11 +21,11 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
     DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
         build-essential \
         ca-certificates \
-        cmake \
         wget \
         git \
         vim \
         fish \
+        libssl-dev \
         libsparsehash-dev \
 	libblas-dev \
 	liblapack-dev \
@@ -81,16 +81,39 @@ RUN tar xzvf boost_1_76_0.tar.gz
 RUN cp -r ./boost_1_76_0/boost /usr/include
 RUN rm -rf ./boost_1_76_0
 RUN rm -rf ./boost_1_76_0.tar.gz
-RUN git clone https://github.com/traveller59/second.pytorch.git --depth 10
-RUN git clone https://github.com/traveller59/SparseConvNet.git --depth 10
+RUN git clone https://github.com/traveller59/spconv.git --depth 10 --recursive
+
+RUN wget https://github.com/Kitware/CMake/releases/download/v3.21.1/cmake-3.21.1.tar.gz
+RUN tar zxvf cmake-3.21.1.tar.gz
+RUN cd cmake-3.21.1/ && \
+	./bootstrap && \
+	make && make install
+ENV PATH /root/cmake-3.21.1/bin:$PATH
+RUN rm -rf ./cmake-3.21.1.tar.gz
+
+# ==================================================================
+# Env for cuda compiler. See https://github.com/pytorch/extension-cpp/issues/71
+# How to find your GPU's CC: https://developer.nvidia.com/cuda-gpus
+# ==================================================================
+ARG TORCH_CUDA_ARCH_LIST="7.5+PTX"
+ENV SPCONV_FORCE_BUILD_CUDA 1
+RUN cd ./spconv && python setup.py bdist_wheel && pip install ./dist/spconv*.whl
 ENV NUMBAPRO_CUDA_DRIVER=/usr/lib/x86_64-linux-gnu/libcuda.so
 ENV NUMBAPRO_NVVM=/usr/local/cuda/nvvm/lib64/libnvvm.so
 ENV NUMBAPRO_LIBDEVICE=/usr/local/cuda/nvvm/libdevice
+
+RUN mkdir -p /root/second.pytorch
 ENV PYTHONPATH=/root/second.pytorch
-RUN cd ./SparseConvNet && python setup.py install && cd .. && rm -rf SparseConvNet
+RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
+	apt-get update && \
+	$APT_INSTALL libgl1-mesa-dev
+RUN PIP_INSTALL="python -m pip --no-cache-dir install --upgrade" && \
+	$PIP_INSTALL tqdm opencv-python seaborn psutil
+
+COPY torchplus/ /root/second.pytorch/torchplus/
+COPY second/ /root/second.pytorch/second/
 
 VOLUME ["/root/data"]
 VOLUME ["/root/model"]
 WORKDIR /root/second.pytorch/second
 
-ENTRYPOINT ["fish"]

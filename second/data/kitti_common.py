@@ -7,6 +7,7 @@ from collections import OrderedDict
 
 import numpy as np
 from skimage import io
+from tqdm import tqdm
 
 
 def area(boxes, add1=False):
@@ -275,8 +276,8 @@ def get_kitti_image_info(path,
         return info
 
     with futures.ThreadPoolExecutor(num_worker) as executor:
-        image_infos = executor.map(map_func, image_ids)
-    return list(image_infos)
+        image_infos = list(tqdm(executor.map(map_func, image_ids), total=len(image_ids)))
+    return image_infos
 
 
 def label_str_to_int(labels, remove_dontcare=True, dtype=np.int32):
