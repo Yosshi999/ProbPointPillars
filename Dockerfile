@@ -108,7 +108,7 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
 	apt-get update && \
 	$APT_INSTALL libgl1-mesa-dev
 RUN PIP_INSTALL="python -m pip --no-cache-dir install --upgrade" && \
-	$PIP_INSTALL tqdm opencv-python seaborn psutil
+	$PIP_INSTALL tqdm opencv-python seaborn psutil tensorboard
 
 COPY torchplus/ /root/second.pytorch/torchplus/
 COPY second/ /root/second.pytorch/second/

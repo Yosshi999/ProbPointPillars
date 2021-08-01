@@ -34,3 +34,11 @@ endif
 		python ./pytorch/train.py train \
 			--config_path=./configs/pointpillars/car/xyres_16.config \
 			--model_dir=/root/model/pointpillars-car-16
+
+.PHONY: board
+board:
+	docker run --rm -it \
+		-v $(MAKEFILE_DIR)/model:/root/model \
+		-p 6006:6006 \
+		$(IMAGE_NAME):latest \
+		tensorboard --logdir /root/model --port 6006 --bind_all
