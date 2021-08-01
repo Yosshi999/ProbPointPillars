@@ -3,11 +3,11 @@
 # ==================================================================
 # module list
 # ------------------------------------------------------------------
-# python        3.6    (apt)
-# pytorch       latest (pip)
+# python        3.9    (apt)
+# pytorch       1.9 (pip)
 # ==================================================================
 
-FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
+FROM nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04
 RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
     PIP_INSTALL="python -m pip --no-cache-dir install --upgrade" && \
     GIT_CLONE="git clone --depth 10" && \
@@ -27,6 +27,9 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
         vim \
         fish \
         libsparsehash-dev \
+	libblas-dev \
+	liblapack-dev \
+	libhdf5-dev \
         && \
 # ==================================================================
 # python
@@ -37,14 +40,15 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
-        python3.6 \
-        python3.6-dev \
+        python3.9 \
+        python3.9-dev \
+	python3.9-distutils \
         && \
     wget -O ~/get-pip.py \
         https://bootstrap.pypa.io/get-pip.py && \
-    python3.6 ~/get-pip.py && \
-    ln -s /usr/bin/python3.6 /usr/local/bin/python3 && \
-    ln -s /usr/bin/python3.6 /usr/local/bin/python && \
+    python3.9 ~/get-pip.py && \
+    ln -s /usr/bin/python3.9 /usr/local/bin/python3 && \
+    ln -s /usr/bin/python3.9 /usr/local/bin/python && \
     $PIP_INSTALL \
         setuptools \
         && \
@@ -57,13 +61,7 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
 # ==================================================================
 # pytorch
 # ------------------------------------------------------------------
-    $PIP_INSTALL \
-        torch_nightly -f \
-        https://download.pytorch.org/whl/nightly/cu90/torch_nightly.html \
-        && \
-    $PIP_INSTALL \
-        torchvision_nightly \
-        && \
+    $PIP_INSTALL torch torchvision && \
 # ==================================================================
 # config & cleanup
 # ------------------------------------------------------------------
@@ -78,18 +76,18 @@ RUN PIP_INSTALL="python -m pip --no-cache-dir install --upgrade" && \
         scikit-image numba pillow
 
 WORKDIR /root
-RUN wget https://dl.bintray.com/boostorg/release/1.68.0/source/boost_1_68_0.tar.gz
-RUN tar xzvf boost_1_68_0.tar.gz
-RUN cp -r ./boost_1_68_0/boost /usr/include
-RUN rm -rf ./boost_1_68_0
-RUN rm -rf ./boost_1_68_0.tar.gz
+RUN wget https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.tar.gz
+RUN tar xzvf boost_1_76_0.tar.gz
+RUN cp -r ./boost_1_76_0/boost /usr/include
+RUN rm -rf ./boost_1_76_0
+RUN rm -rf ./boost_1_76_0.tar.gz
 RUN git clone https://github.com/traveller59/second.pytorch.git --depth 10
 RUN git clone https://github.com/traveller59/SparseConvNet.git --depth 10
-RUN cd ./SparseConvNet && python setup.py install && cd .. && rm -rf SparseConvNet
 ENV NUMBAPRO_CUDA_DRIVER=/usr/lib/x86_64-linux-gnu/libcuda.so
 ENV NUMBAPRO_NVVM=/usr/local/cuda/nvvm/lib64/libnvvm.so
 ENV NUMBAPRO_LIBDEVICE=/usr/local/cuda/nvvm/libdevice
 ENV PYTHONPATH=/root/second.pytorch
+RUN cd ./SparseConvNet && python setup.py install && cd .. && rm -rf SparseConvNet
 
 VOLUME ["/root/data"]
 VOLUME ["/root/model"]
