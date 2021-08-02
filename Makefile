@@ -21,6 +21,8 @@ endif
 		$(IMAGE_NAME):latest \
 		python create_data.py kitti_data_prep --root_path=/root/data
        	
+CONF := pointpillars/car/xyres_16.config
+EXP := pointpillars-car-16
 .PHONY: train
 train:
 ifndef KITTI_DATASET_ROOT
@@ -32,8 +34,9 @@ endif
 		-v $(MAKEFILE_DIR)/model:/root/model \
 		$(IMAGE_NAME):latest \
 		python ./pytorch/train.py train \
-			--config_path=./configs/pointpillars/car/xyres_16.config \
-			--model_dir=/root/model/pointpillars-car-16
+			--config_path=./configs/$(CONF) \
+			--model_dir=/root/model/$(EXP)
+	git rev-parse HEAD > $(MAKEFILE_DIR)/model/$(EXP)/commit-hash.txt
 
 .PHONY: board
 board:
