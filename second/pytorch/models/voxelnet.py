@@ -695,9 +695,11 @@ class VoxelNet(nn.Module):
             "pr": {},
         }
         if self._estimate_box_logvariance:
-            ret["rpn_loc_uncertainty"] = float(self.rpn_loc_uncertainty(loc_uncs).numpy()[0])
-            ret["rpn_dim_uncertainty"] = float(self.rpn_dim_uncertainty(dim_uncs).numpy()[0])
-            ret["rpn_rot_uncertainty"] = float(self.rpn_rot_uncertainty(rot_uncs).numpy()[0])
+            ret["uncertainty"] = {
+                "rpn_loc_uncertainty": float(self.rpn_loc_uncertainty(loc_uncs).numpy()[0]),
+                "rpn_dim_uncertainty": float(self.rpn_dim_uncertainty(dim_uncs).numpy()[0]),
+                "rpn_rot_uncertainty": float(self.rpn_rot_uncertainty(rot_uncs).numpy()[0]),
+            }
         for i, thresh in enumerate(self.rpn_metrics.thresholds):
             ret["pr"][f"prec@{int(thresh*100)}"] = float(prec[i])
             ret["pr"][f"rec@{int(thresh*100)}"] = float(recall[i])
