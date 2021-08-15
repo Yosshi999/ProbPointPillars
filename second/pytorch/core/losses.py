@@ -190,7 +190,7 @@ class WeightedSmoothL1LocalizationLossWithUncertainty(WeightedSmoothL1Localizati
 
   See also Equation (3) in the Fast R-CNN paper by Ross Girshick (ICCV 2015)
   """
-  def __init__(*args, **kwargs):
+  def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
   def _compute_loss(self, prediction_tensor, target_tensor, logvars=None, weights=None):
