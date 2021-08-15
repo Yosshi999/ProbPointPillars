@@ -61,7 +61,8 @@ message VoxelNet {
   int64 num_direction_bins = 22;
   float direction_limit_offset = 23;
 
+  bool estimate_box_logvariance = 24;
+
   // deprecated in future
-  bool lidar_input = 24;
-  
+  bool lidar_input = 25;
 }

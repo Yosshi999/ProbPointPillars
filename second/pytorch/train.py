@@ -312,6 +312,9 @@ def train(config_path,
                 cls_neg_loss = ret_dict["cls_neg_loss"].mean()
                 loc_loss = ret_dict["loc_loss"]
                 cls_loss = ret_dict["cls_loss"]
+                loc_unc_reduced = ret_dict.get("loc_unc_preds_reduced", None)
+                dim_unc_reduced = ret_dict.get("dim_unc_preds_reduced", None)
+                rot_unc_reduced = ret_dict.get("rot_unc_preds_reduced", None)
                 
                 cared = ret_dict["cared"]
                 labels = example_torch["labels"]
@@ -326,7 +329,8 @@ def train(config_path,
                 net.update_global_step()
                 net_metrics = net.update_metrics(cls_loss_reduced,
                                                  loc_loss_reduced, cls_preds,
-                                                 labels, cared)
+                                                 labels, cared,
+                                                 loc_unc_reduced, dim_unc_reduced, rot_unc_reduced)
 
                 step_time = (time.time() - t)
                 step_times.append(step_time)

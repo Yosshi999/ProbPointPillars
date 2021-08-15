@@ -78,6 +78,7 @@ class VoxelNet(nn.Module):
                  use_groupnorm=False,
                  num_groups=32,
                  use_direction_classifier=True,
+                 estimate_box_logvariance=False,
                  use_sigmoid_score=False,
                  encode_background_as_zeros=True,
                  use_rotate_nms=True,
@@ -118,6 +119,7 @@ class VoxelNet(nn.Module):
         self._use_sigmoid_score = use_sigmoid_score
         self._encode_background_as_zeros = encode_background_as_zeros
         self._use_direction_classifier = use_direction_classifier
+        self._estimate_box_logvariance = estimate_box_logvariance
         self._num_input_features = num_input_features
         self._box_coder = target_assigner.box_coder
         self.target_assigner = target_assigner
@@ -165,6 +167,7 @@ class VoxelNet(nn.Module):
             num_anchor_per_loc=target_assigner.num_anchors_per_location,
             encode_background_as_zeros=encode_background_as_zeros,
             use_direction_classifier=use_direction_classifier,
+            estimate_box_logvariance=estimate_box_logvariance,
             use_groupnorm=use_groupnorm,
             num_groups=num_groups,
             box_code_size=target_assigner.box_coder.code_size,
@@ -182,6 +185,9 @@ class VoxelNet(nn.Module):
         self.rpn_cls_loss = metrics.Scalar()
         self.rpn_loc_loss = metrics.Scalar()
         self.rpn_total_loss = metrics.Scalar()
+        self.rpn_loc_uncertainty = metrics.Scalar()
+        self.rpn_dim_uncertainty = metrics.Scalar()
+        self.rpn_rot_uncertainty = metrics.Scalar()
         self.register_buffer("global_step", torch.LongTensor(1).zero_())
 
         self._time_dict = {}
@@ -239,7 +245,9 @@ class VoxelNet(nn.Module):
     def loss(self, example, preds_dict):
         box_preds = preds_dict["box_preds"]
         cls_preds = preds_dict["cls_preds"]
+        box_logvar_preds = preds_dict.get("box_logvar_preds", None)
         batch_size_dev = cls_preds.shape[0]
+        box_code_size = self._box_coder.code_size
         self.start_timer("loss forward")
         labels = example['labels']
         reg_targets = example['reg_targets']
@@ -265,10 +273,11 @@ class VoxelNet(nn.Module):
             cls_weights=cls_weights * importance,
             reg_targets=reg_targets,
             reg_weights=reg_weights * importance,
+            box_logvar_preds=box_logvar_preds,
             num_class=self._num_class,
             encode_rad_error_by_sin=self._encode_rad_error_by_sin,
             encode_background_as_zeros=self._encode_background_as_zeros,
-            box_code_size=self._box_coder.code_size,
+            box_code_size=box_code_size,
             sin_error_factor=self._sin_error_factor,
             num_direction_bins=self._num_direction_bins,
         )
@@ -309,6 +318,15 @@ class VoxelNet(nn.Module):
         }
         if self._use_direction_classifier:
             res["dir_loss_reduced"] = dir_loss
+        if self._estimate_box_logvariance:
+            # This assumes that reg_weights has shape (B, num_anchors)
+            box_vars_weighted = (
+                torch.exp(box_logvar_preds).view(batch_size_dev, -1, box_code_size) *
+                reg_weights.unsqueeze(-1)
+            ) / batch_size_dev
+            res["loc_unc_preds_reduced"] = box_vars_weighted[..., 0:3].sum()
+            res["dim_unc_preds_reduced"] = box_vars_weighted[..., 3:6].sum()
+            res["rot_unc_preds_reduced"] = box_vars_weighted[..., 6:7].sum()
         return res
 
     def network_forward(self, voxels, num_points, coors, batch_size):
@@ -650,8 +668,11 @@ class VoxelNet(nn.Module):
         self.rpn_cls_loss.float()
         self.rpn_loc_loss.float()
         self.rpn_total_loss.float()
+        self.rpn_loc_uncertainty.float()
+        self.rpn_dim_uncertainty.float()
+        self.rpn_rot_uncertainty.float()
 
-    def update_metrics(self, cls_loss, loc_loss, cls_preds, labels, sampled):
+    def update_metrics(self, cls_loss, loc_loss, cls_preds, labels, sampled, loc_uncs, dim_uncs, rot_uncs):
         batch_size = cls_preds.shape[0]
         num_class = self._num_class
         if not self._encode_background_as_zeros:
@@ -673,6 +694,10 @@ class VoxelNet(nn.Module):
             "rpn_acc": float(rpn_acc),
             "pr": {},
         }
+        if self._estimate_box_logvariance:
+            ret["rpn_loc_uncertainty"] = float(self.rpn_loc_uncertainty(loc_uncs).numpy()[0])
+            ret["rpn_dim_uncertainty"] = float(self.rpn_dim_uncertainty(dim_uncs).numpy()[0])
+            ret["rpn_rot_uncertainty"] = float(self.rpn_rot_uncertainty(rot_uncs).numpy()[0])
         for i, thresh in enumerate(self.rpn_metrics.thresholds):
             ret["pr"][f"prec@{int(thresh*100)}"] = float(prec[i])
             ret["pr"][f"rec@{int(thresh*100)}"] = float(recall[i])
@@ -684,6 +709,9 @@ class VoxelNet(nn.Module):
         self.rpn_cls_loss.clear()
         self.rpn_loc_loss.clear()
         self.rpn_total_loss.clear()
+        self.rpn_loc_uncertainty.clear()
+        self.rpn_dim_uncertainty.clear()
+        self.rpn_rot_uncertainty.clear()
 
     @staticmethod
     def convert_norm_to_float(net):
@@ -722,6 +750,7 @@ def create_loss(loc_loss_ftor,
                 cls_weights,
                 reg_targets,
                 reg_weights,
+                box_logvar_preds,
                 num_class,
                 encode_background_as_zeros=True,
                 encode_rad_error_by_sin=True,
@@ -734,6 +763,8 @@ def create_loss(loc_loss_ftor,
         cls_preds = cls_preds.view(batch_size, -1, num_class)
     else:
         cls_preds = cls_preds.view(batch_size, -1, num_class + 1)
+    if box_logvar_preds is not None:
+        box_logvar_preds = box_logvar_preds.view(batch_size, -1, box_code_size)
     cls_targets = cls_targets.squeeze(-1)
     one_hot_targets = torchplus.nn.one_hot(
         cls_targets, depth=num_class + 1, dtype=box_preds.dtype)
@@ -746,8 +777,12 @@ def create_loss(loc_loss_ftor,
         box_preds, reg_targets = add_sin_difference(box_preds, reg_targets, box_preds[..., 6:7], reg_targets[..., 6:7],
                                                     sin_error_factor)
 
-    loc_losses = loc_loss_ftor(
-        box_preds, reg_targets, weights=reg_weights)  # [N, M]
+    if box_logvar_preds is None:
+        loc_losses = loc_loss_ftor(
+            box_preds, reg_targets, weights=reg_weights)  # [N, M]
+    else:
+        loc_losses = loc_loss_ftor(
+            box_preds, reg_targets, logvars=box_logvar_preds, weights=reg_weights)  # [N, M]
     cls_losses = cls_loss_ftor(
         cls_preds, one_hot_targets, weights=cls_weights)  # [N, M]
     return loc_losses, cls_losses
