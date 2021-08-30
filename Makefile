@@ -36,8 +36,29 @@ endif
 		python ./pytorch/train.py train \
 			--config_path=./configs/$(CONF) \
 			--model_dir=/root/model/$(EXP)
-	git rev-parse HEAD > $(MAKEFILE_DIR)/model/$(EXP)/commit-hash.txt
-
+	docker run --rm -it \
+		-v $(MAKEFILE_DIR)/model:/root/model \
+		$(IMAGE_NAME):latest \
+		/bin/sh -c "echo `git rev-parse HEAD` > /root/model/$(EXP)/commit-hash.txt"
+.PHONY: eval
+eval:
+ifndef KITTI_DATASET_ROOT
+	echo "argument KITTI_DATASET_ROOT is not defined"
+	exit 1
+endif
+	docker run --rm -it --gpus all \
+		-v /hdd/kitti:/root/data \
+		-v $(MAKEFILE_DIR)/model:/root/model \
+		$(IMAGE_NAME):latest \
+		python ./pytorch/train.py evaluate \
+			--config_path=./configs/$(CONF) \
+			--model_dir=/root/model/$(EXP) \
+			--measure_time=True \
+			--batch_size=1
+	docker run --rm -it \
+		-v $(MAKEFILE_DIR)/model:/root/model \
+		$(IMAGE_NAME):latest \
+		/bin/sh -c "echo `git rev-parse HEAD` > /root/model/$(EXP)/eval_results/commit-hash.txt"
 .PHONY: board
 board:
 	docker run --rm -it \
