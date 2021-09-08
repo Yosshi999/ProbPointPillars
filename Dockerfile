@@ -109,6 +109,8 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
 	$APT_INSTALL libgl1-mesa-dev
 RUN PIP_INSTALL="python -m pip --no-cache-dir install --upgrade" && \
 	$PIP_INSTALL tqdm opencv-python seaborn psutil tensorboard
+RUN PIP_INSTALL="python -m pip --no-cache-dir install --upgrade" && \
+	$PIP_INSTALL Flask flask-cors
 
 COPY torchplus/ /root/second.pytorch/torchplus/
 COPY second/ /root/second.pytorch/second/

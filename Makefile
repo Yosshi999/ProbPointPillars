@@ -66,3 +66,13 @@ board:
 		-p 6006:6006 \
 		$(IMAGE_NAME):latest \
 		tensorboard --logdir /root/model --port 6006 --bind_all
+
+BACKEND_PORT := 16666
+.PHONY: viewer
+viewer:
+	docker run --rm -it --gpus all \
+		-v /hdd/kitti:/root/data \
+		-v $(MAKEFILE_DIR)/model:/root/model \
+		--publish=$(BACKEND_PORT):$(BACKEND_PORT) \
+		$(IMAGE_NAME):latest \
+		python ./kittiviewer/backend/main.py main --port=$(BACKEND_PORT)

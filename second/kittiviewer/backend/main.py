@@ -13,7 +13,7 @@ import fire
 import torch
 import numpy as np
 import skimage
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS
 from google.protobuf import text_format
 from skimage import io
@@ -48,9 +48,9 @@ def error_response(msg):
     print("[ERROR]" + msg)
     return response
 
-
 @app.route('/api/readinfo', methods=['POST'])
 def readinfo():
+    app.logger.info("readinfo")
     global BACKEND
     instance = request.json
     root_path = Path(instance["root_path"])
@@ -62,7 +62,6 @@ def readinfo():
     BACKEND.image_idxes = list(range(len(BACKEND.dataset)))
     response["image_indexes"] = BACKEND.image_idxes
     response = jsonify(results=[response])
-    response.headers['Access-Control-Allow-Headers'] = '*'
     return response
 
 @app.route('/api/read_detection', methods=['POST'])
@@ -80,7 +79,6 @@ def read_detection():
         dt_annos = kitti.get_label_annos(det_path)
     BACKEND.dt_annos = dt_annos
     response = jsonify(results=[response])
-    response.headers['Access-Control-Allow-Headers'] = '*'
     return response
 
 
@@ -119,7 +117,6 @@ def get_pointcloud():
     # if "score" in annos:
     #     response["score"] = score.tolist()
     response = jsonify(results=[response])
-    response.headers['Access-Control-Allow-Headers'] = '*'
     print("send response with size {}!".format(len(pc_str)))
     return response
 
@@ -147,7 +144,6 @@ def get_image():
     else:
         response["image_b64"] = ""
     response = jsonify(results=[response])
-    response.headers['Access-Control-Allow-Headers'] = '*'
     return response
 
 @app.route('/api/build_network', methods=['POST'])
@@ -182,7 +178,6 @@ def build_network_():
     BACKEND.config = config
     BACKEND.device = device
     response = jsonify(results=[response])
-    response.headers['Access-Control-Allow-Headers'] = '*'
     print("build_network successful!")
     return response
 
@@ -218,12 +213,16 @@ def inference_by_idx():
     response["dt_scores"] = pred["scores"].detach().cpu().numpy().tolist()
 
     response = jsonify(results=[response])
-    response.headers['Access-Control-Allow-Headers'] = '*'
     return response
 
+@app.route('/api/version', methods=['GET'])
+def version():
+    app.logger.info("version")
+    response = {"status": "normal"}
+    return jsonify(results=[response])
 
 def main(port=16666):
-    app.run(host='127.0.0.1', threaded=True, port=port)
+    app.run(host='0.0.0.0', threaded=True, port=port)
 
 if __name__ == '__main__':
     fire.Fire()
