@@ -16,10 +16,10 @@ endif
 	mkdir -p $(KITTI_DATASET_ROOT)/training/velodyne_reduced && \
 	mkdir -p $(KITTI_DATASET_ROOT)/testing/velodyne_reduced && \
 	docker run --rm -it --gpus all \
-		-v /hdd/kitti:/root/data \
-		-v $(MAKEFILE_DIR)/model:/root/model \
+		-v /hdd/kitti:/app/data \
+		-v $(MAKEFILE_DIR)/model:/app/model \
 		$(IMAGE_NAME):latest \
-		python create_data.py kitti_data_prep --root_path=/root/data
+		python create_data.py kitti_data_prep --root_path=/app/data
        	
 CONF := pointpillars/car/xyres_16.config
 EXP := pointpillars-car-16
@@ -30,16 +30,16 @@ ifndef KITTI_DATASET_ROOT
 	exit 1
 endif
 	docker run --rm -it --gpus all \
-		-v /hdd/kitti:/root/data \
-		-v $(MAKEFILE_DIR)/model:/root/model \
+		-v /hdd/kitti:/app/data \
+		-v $(MAKEFILE_DIR)/model:/app/model \
 		$(IMAGE_NAME):latest \
 		python ./pytorch/train.py train \
 			--config_path=./configs/$(CONF) \
-			--model_dir=/root/model/$(EXP)
+			--model_dir=/app/model/$(EXP)
 	docker run --rm -it \
-		-v $(MAKEFILE_DIR)/model:/root/model \
+		-v $(MAKEFILE_DIR)/model:/app/model \
 		$(IMAGE_NAME):latest \
-		/bin/sh -c "echo `git rev-parse HEAD` > /root/model/$(EXP)/commit-hash.txt"
+		/bin/sh -c "echo `git rev-parse HEAD` > /app/model/$(EXP)/commit-hash.txt"
 .PHONY: eval
 eval:
 ifndef KITTI_DATASET_ROOT
@@ -47,32 +47,32 @@ ifndef KITTI_DATASET_ROOT
 	exit 1
 endif
 	docker run --rm -it --gpus all \
-		-v /hdd/kitti:/root/data \
-		-v $(MAKEFILE_DIR)/model:/root/model \
+		-v /hdd/kitti:/app/data \
+		-v $(MAKEFILE_DIR)/model:/app/model \
 		$(IMAGE_NAME):latest \
 		python ./pytorch/train.py evaluate \
 			--config_path=./configs/$(CONF) \
-			--model_dir=/root/model/$(EXP) \
+			--model_dir=/app/model/$(EXP) \
 			--measure_time=True \
 			--batch_size=1
 	docker run --rm -it \
-		-v $(MAKEFILE_DIR)/model:/root/model \
+		-v $(MAKEFILE_DIR)/model:/app/model \
 		$(IMAGE_NAME):latest \
-		/bin/sh -c "echo `git rev-parse HEAD` > /root/model/$(EXP)/eval_results/commit-hash.txt"
+		/bin/sh -c "echo `git rev-parse HEAD` > /app/model/$(EXP)/eval_results/commit-hash.txt"
 .PHONY: board
 board:
 	docker run --rm -it \
-		-v $(MAKEFILE_DIR)/model:/root/model \
+		-v $(MAKEFILE_DIR)/model:/app/model \
 		-p 6006:6006 \
 		$(IMAGE_NAME):latest \
-		tensorboard --logdir /root/model --port 6006 --bind_all
+		tensorboard --logdir /app/model --port 6006 --bind_all
 
 BACKEND_PORT := 16666
 .PHONY: viewer
 viewer:
 	docker run --rm -it --gpus all \
-		-v /hdd/kitti:/root/data \
-		-v $(MAKEFILE_DIR)/model:/root/model \
+		-v /hdd/kitti:/app/data \
+		-v $(MAKEFILE_DIR)/model:/app/model \
 		--publish=$(BACKEND_PORT):$(BACKEND_PORT) \
 		$(IMAGE_NAME):latest \
 		python ./kittiviewer/backend/main.py main --port=$(BACKEND_PORT)
