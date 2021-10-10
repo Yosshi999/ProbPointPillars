@@ -213,6 +213,7 @@ def compute_statistics_jit(overlaps,
     thresh_idx = 0
     delta = np.zeros((gt_size, ))
     delta_idx = 0
+    det_results = np.zeros((det_size, )) # -1: fp, 0: ignore, 1: tp
     for i in range(gt_size):
         if ignored_gt[i] == -1:
             continue
@@ -253,9 +254,11 @@ def compute_statistics_jit(overlaps,
         elif ((valid_detection != NO_DETECTION)
               and (ignored_gt[i] == 1 or ignored_det[det_idx] == 1)):
             assigned_detection[det_idx] = True
+            det_results[det_idx] = 0
         elif valid_detection != NO_DETECTION:
             # only a tp add a threshold.
             tp += 1
+            det_results[det_idx] = 1
             # thresholds.append(dt_scores[det_idx])
             thresholds[thresh_idx] = dt_scores[det_idx]
             thresh_idx += 1
@@ -270,6 +273,7 @@ def compute_statistics_jit(overlaps,
             if (not (assigned_detection[i] or ignored_det[i] == -1
                      or ignored_det[i] == 1 or ignored_threshold[i])):
                 fp += 1
+                det_results[i] = -1
         nstuff = 0
         if metric == 0:
             overlaps_dt_dc = image_box_overlap(dt_bboxes, dc_bboxes, 0)
@@ -297,7 +301,8 @@ def compute_statistics_jit(overlaps,
                 similarity = np.sum(tmp)
             else:
                 similarity = -1
-    return tp, fp, fn, similarity, thresholds[:thresh_idx]
+
+    return tp, fp, fn, similarity, thresholds[:thresh_idx], det_results
 
 
 def get_split_parts(num, num_part):
@@ -337,7 +342,7 @@ def fused_compute_statistics(overlaps,
             ignored_gt = ignored_gts[gt_num:gt_num + gt_nums[i]]
             ignored_det = ignored_dets[dt_num:dt_num + dt_nums[i]]
             dontcare = dontcares[dc_num:dc_num + dc_nums[i]]
-            tp, fp, fn, similarity, _ = compute_statistics_jit(
+            tp, fp, fn, similarity, _, _ = compute_statistics_jit(
                 overlap,
                 gt_data,
                 dt_data,
@@ -542,7 +547,7 @@ def eval_class_v3(gt_annos,
                         min_overlap=min_overlap,
                         thresh=0.0,
                         compute_fp=False)
-                    tp, fp, fn, similarity, thresholds = rets
+                    tp, fp, fn, similarity, thresholds, _ = rets
                     thresholdss += thresholds.tolist()
                 thresholdss = np.array(thresholdss)
                 thresholds = get_thresholds(thresholdss, total_num_valid_gt)
@@ -671,7 +676,8 @@ def do_eval_v3(gt_annos,
                compute_aos=False,
                difficultys=(0, 1, 2),
                z_axis=1,
-               z_center=1.0):
+               z_center=1.0,
+               update_detections=False):
     # min_overlaps: [num_minoverlap, metric, num_class]
     types = ["bbox", "bev", "3d"]
     metrics = {}
@@ -687,6 +693,39 @@ def do_eval_v3(gt_annos,
             z_axis=z_axis,
             z_center=z_center)
         metrics[types[i]] = ret
+    if update_detections:
+        # 3d detection fp / tp
+        rets = calculate_iou_partly(
+            dt_annos,
+            gt_annos,
+            metric=2,
+            num_parts=50,
+            z_axis=z_axis,
+            z_center=z_center)
+        overlaps, parted_overlaps, total_dt_num, total_gt_num = rets
+        for l, difficulty in enumerate(difficultys):
+            (gt_datas_list, dt_datas_list, ignored_gts, ignored_dets,
+            dontcares, total_dc_num, total_num_valid_gt) = _prepare_data(
+                gt_annos, dt_annos, current_classes[0], difficulty
+            )
+            for i in range(len(gt_annos)):
+                tp, fp, _, _, _, det_results = compute_statistics_jit(
+                    overlaps[i],
+                    gt_datas_list[i],
+                    dt_datas_list[i],
+                    ignored_gts[i],
+                    ignored_dets[i],
+                    dontcares[i],
+                    metric=2,
+                    min_overlap=0.7,
+                    thresh=0.0,
+                    compute_fp=True)
+                dt_annos[i][f"official/overlaps"] = overlaps[i]
+                dt_annos[i][f"official/3d_0.70/{l}/bin"] = det_results
+                dt_annos[i][f"official/3d_0.70/{l}/tp"] = tp
+                dt_annos[i][f"official/3d_0.70/{l}/fp"] = fp
+                assert len(dt_annos[i]["bbox"]) == len(det_results)
+
     return metrics
 
 
@@ -784,7 +823,8 @@ def get_official_eval_result(gt_annos,
         compute_aos,
         difficultys,
         z_axis=z_axis,
-        z_center=z_center)
+        z_center=z_center,
+        update_detections=True)
     detail = {}
     for j, curcls in enumerate(current_classes):
         # mAP threshold array: [num_minoverlap, metric, class]
@@ -816,6 +856,7 @@ def get_official_eval_result(gt_annos,
     return {
         "result": result,
         "detail": detail,
+        "detections": dt_annos,
     }
 
 
