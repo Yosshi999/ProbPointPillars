@@ -547,6 +547,83 @@ def evaluate(config_path,
         for k, v in result_dict["results"].items():
             print("Evaluation {}".format(k))
             print(v)
+        with open(result_path_step / "result_kitti.pkl", 'wb') as f:
+            pickle.dump(result_dict["result_kitti"], f)
+        with open(result_path_step / "result_evaluation.pkl", 'wb') as f:
+            pickle.dump(result_dict["results"], f)
+
+def evaluate_from_result(config_path,
+                         result_path_step=None,
+                         measure_time=False,
+                         batch_size=None,
+                         **kwargs):
+    """Don't support pickle_result anymore. if you want to generate kitti label file,
+    please use kitti_anno_to_label_file and convert_detection_to_kitti_annos
+    in second.data.kitti_dataset.
+    """
+    assert len(kwargs) == 0
+    assert result_path_step is not None
+    result_path_step = Path(result_path_step)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if isinstance(config_path, str):
+        # directly provide a config object. this usually used
+        # when you want to eval with several different parameters in
+        # one script.
+        config = pipeline_pb2.TrainEvalPipelineConfig()
+        with open(config_path, "r") as f:
+            proto_str = f.read()
+            text_format.Merge(proto_str, config)
+    else:
+        config = config_path
+
+    input_cfg = config.eval_input_reader
+    model_cfg = config.model.second
+    train_cfg = config.train_config
+
+    net = build_network(model_cfg, measure_time=measure_time).to(device)
+    if train_cfg.enable_mixed_precision:
+        net.half()
+        print("half inference!")
+        net.metrics_to_float()
+        net.convert_norm_to_float(net)
+    target_assigner = net.target_assigner
+    voxel_generator = net.voxel_generator
+
+    batch_size = batch_size or input_cfg.batch_size
+    eval_dataset = input_reader_builder.build(
+        input_cfg,
+        model_cfg,
+        training=False,
+        voxel_generator=voxel_generator,
+        target_assigner=target_assigner)
+    eval_dataloader = torch.utils.data.DataLoader(
+        eval_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=input_cfg.preprocess.num_workers,
+        pin_memory=False,
+        collate_fn=merge_second_batch)
+
+    if train_cfg.enable_mixed_precision:
+        float_dtype = torch.float16
+    else:
+        float_dtype = torch.float32
+
+    net.eval()
+
+    with open(result_path_step / "result.pkl", 'rb') as f:
+        detections = pickle.load(f)
+    result_dict = eval_dataset.dataset.evaluation(detections,
+                                                  str(result_path_step))
+    if result_dict is not None:
+        for k, v in result_dict["results"].items():
+            print("Evaluation {}".format(k))
+            print(v)
+        with open(result_path_step / "result_kitti.pkl", 'wb') as f:
+            pickle.dump(result_dict["result_kitti"], f)
+        with open(result_path_step / "result_evaluation.pkl", 'wb') as f:
+            pickle.dump(result_dict["results"], f)
+
 
 def helper_tune_target_assigner(config_path, target_rate=None, update_freq=200, update_delta=0.01, num_tune_epoch=5):
     """get information of target assign to tune thresholds in anchor generator.

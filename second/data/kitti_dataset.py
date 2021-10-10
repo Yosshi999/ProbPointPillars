@@ -159,6 +159,7 @@ class KittiDataset(Dataset):
                     "coco": result_coco["detail"]
                 }
             },
+            "result_kitti": result_official_dict["detections"],
         }
 
     def __getitem__(self, idx):

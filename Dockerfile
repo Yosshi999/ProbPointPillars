@@ -75,7 +75,7 @@ RUN PIP_INSTALL="python -m pip --no-cache-dir install --upgrade" && \
         shapely fire pybind11 tensorboardX protobuf \
         scikit-image numba pillow
 
-WORKDIR /root
+WORKDIR /app
 RUN wget https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.tar.gz
 RUN tar xzvf boost_1_76_0.tar.gz
 RUN cp -r ./boost_1_76_0/boost /usr/include
@@ -88,7 +88,7 @@ RUN tar zxvf cmake-3.21.1.tar.gz
 RUN cd cmake-3.21.1/ && \
 	./bootstrap && \
 	make && make install
-ENV PATH /root/cmake-3.21.1/bin:$PATH
+ENV PATH /app/cmake-3.21.1/bin:$PATH
 RUN rm -rf ./cmake-3.21.1.tar.gz
 
 # ==================================================================
@@ -102,18 +102,20 @@ ENV NUMBAPRO_CUDA_DRIVER=/usr/lib/x86_64-linux-gnu/libcuda.so
 ENV NUMBAPRO_NVVM=/usr/local/cuda/nvvm/lib64/libnvvm.so
 ENV NUMBAPRO_LIBDEVICE=/usr/local/cuda/nvvm/libdevice
 
-RUN mkdir -p /root/second.pytorch
-ENV PYTHONPATH=/root/second.pytorch
+RUN mkdir -p /app/second.pytorch
+ENV PYTHONPATH=/app/second.pytorch
 RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
 	apt-get update && \
 	$APT_INSTALL libgl1-mesa-dev
 RUN PIP_INSTALL="python -m pip --no-cache-dir install --upgrade" && \
 	$PIP_INSTALL tqdm opencv-python seaborn psutil tensorboard
+RUN PIP_INSTALL="python -m pip --no-cache-dir install --upgrade" && \
+	$PIP_INSTALL Flask flask-cors
 
-COPY torchplus/ /root/second.pytorch/torchplus/
-COPY second/ /root/second.pytorch/second/
+COPY torchplus/ /app/second.pytorch/torchplus/
+COPY second/ /app/second.pytorch/second/
 
-VOLUME ["/root/data"]
-VOLUME ["/root/model"]
-WORKDIR /root/second.pytorch/second
+VOLUME ["/app/data"]
+VOLUME ["/app/model"]
+WORKDIR /app/second.pytorch/second
 
