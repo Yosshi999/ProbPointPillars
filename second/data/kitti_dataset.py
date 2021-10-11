@@ -148,6 +148,42 @@ class KittiDataset(Dataset):
             self._class_names,
             z_axis=z_axis,
             z_center=z_center)
+        
+        # feature extraction
+        for info, det in tqdm(zip(self._kitti_infos, dt_annos), desc="feature", total=len(dt_annos)):
+            pc_info = info["point_cloud"]
+            image_info = info["image"]
+            calib = info["calib"]
+
+            num_features = pc_info["num_features"]
+            v_path = self._root_path / pc_info["velodyne_path"]
+            v_path = str(v_path.parent.parent / (v_path.parent.stem + "_reduced") / v_path.name)
+            points_v = np.fromfile(
+                v_path, dtype=np.float32, count=-1).reshape([-1, num_features])
+            rect = calib['R0_rect']
+            Trv2c = calib['Tr_velo_to_cam']
+            P2 = calib['P2']
+            if False: # No longer you need remove outside image-rect (*_reduced pointcloud is already filtered.)
+                points_v = box_np_ops.remove_outside_points(
+                    points_v, rect, Trv2c, P2, image_info["image_shape"])
+
+            annos = det
+            num_obj = len([n for n in annos['name'] if n != 'DontCare'])
+            # annos = kitti.filter_kitti_anno(annos, ['DontCare'])
+            dims = annos['dimensions'][:num_obj]
+            loc = annos['location'][:num_obj]
+            rots = annos['rotation_y'][:num_obj]
+            gt_boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]],
+                                            axis=1)
+            gt_boxes_lidar = box_np_ops.box_camera_to_lidar(
+                gt_boxes_camera, rect, Trv2c)
+            indices = box_np_ops.points_in_rbbox(points_v[:, :3], gt_boxes_lidar)
+            num_points_in_gt = indices.sum(0)
+            num_ignored = len(annos['dimensions']) - num_obj
+            num_points_in_gt = np.concatenate(
+                [num_points_in_gt, -np.ones([num_ignored])])
+            annos["num_points_in_det"] = num_points_in_gt.astype(np.int32)
+
         return {
             "results": {
                 "official": result_official_dict["result"],
