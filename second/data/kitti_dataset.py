@@ -130,8 +130,14 @@ class KittiDataset(Dataset):
         """
         if "annos" not in self._kitti_infos[0]:
             return None
-        gt_annos = [info["annos"] for info in self._kitti_infos]
         dt_annos = self.convert_detection_to_kitti_annos(detections)
+        with open(Path(output_dir) / "detections_kitti.pkl", 'wb') as f:
+            pickle.dump(dt_annos, f)
+        return self.evaluation_from_kitti_dets(dt_annos, output_dir=output_dir)
+    def evaluation_from_kitti_dets(self, dt_annos, output_dir):
+        if "annos" not in self._kitti_infos[0]:
+            return None
+        gt_annos = [info["annos"] for info in self._kitti_infos]
         # firstly convert standard detection to kitti-format dt annos
         z_axis = 1  # KITTI camera format use y as regular "z" axis.
         z_center = 1.0  # KITTI camera box's center is [0.5, 1, 0.5]

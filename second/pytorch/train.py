@@ -552,6 +552,7 @@ def evaluate_from_result(config_path,
                          result_path_step=None,
                          measure_time=False,
                          batch_size=None,
+                         use_detections_kitti=False,
                          **kwargs):
     """Don't support pickle_result anymore. if you want to generate kitti label file,
     please use kitti_anno_to_label_file and convert_detection_to_kitti_annos
@@ -607,10 +608,16 @@ def evaluate_from_result(config_path,
 
     net.eval()
 
-    with open(result_path_step / "result.pkl", 'rb') as f:
-        detections = pickle.load(f)
-    result_dict = eval_dataset.dataset.evaluation(detections,
-                                                  str(result_path_step))
+    if use_detections_kitti:
+        with open(result_path_step / "detections_kitti.pkl", 'rb') as f:
+            detections = pickle.load(f)
+        result_dict = eval_dataset.dataset.evaluation_from_kitti_dets(detections,
+                                                    str(result_path_step))
+    else:
+        with open(result_path_step / "result.pkl", 'rb') as f:
+            detections = pickle.load(f)
+        result_dict = eval_dataset.dataset.evaluation(detections,
+                                                    str(result_path_step))
     if result_dict is not None:
         for k, v in result_dict["results"].items():
             print("Evaluation {}".format(k))
