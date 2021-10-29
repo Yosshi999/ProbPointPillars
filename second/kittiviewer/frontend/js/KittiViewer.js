@@ -1,11 +1,11 @@
 var KittiViewer = function (pointCloud, logger, imageCanvas) {
-    this.rootPath = "/root/data";
-    this.infoPath = "/root/data/kitti_infos_val.pkl";
-    this.detPath = "/root/model/path/to/results.pkl";
+    this.rootPath = "/app/data";
+    this.infoPath = "/app/data/kitti_infos_val.pkl";
+    this.detPath = "/app/model/path/to/results.pkl";
     this.backend = "http://127.0.0.1:16666";
-    this.checkpointPath = "/root/model/path/to/tckpt";
+    this.checkpointPath = "/app/model/path/to/tckpt";
     this.datasetClassName = "KittiDataset"
-    this.configPath = "/root/second.pytorch/second/configs/config";
+    this.configPath = "/app/second.pytorch/second/configs/config";
     this.drawDet = false;
     this.imageIndexes = [];
     this.imageIndex = 1;
