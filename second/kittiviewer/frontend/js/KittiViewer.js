@@ -6,7 +6,10 @@ var KittiViewer = function (pointCloud, logger, imageCanvas) {
     this.checkpointPath = "/app/model/path/to/tckpt";
     this.datasetClassName = "KittiDataset"
     this.configPath = "/app/second.pytorch/second/configs/config";
+    this.drawGT = true;
     this.drawDet = false;
+    this.applyJetCMap = false;
+    this.detThreshold = 0.5;
     this.imageIndexes = [];
     this.imageIndex = 1;
     this.gtBoxes = [];
@@ -214,6 +217,7 @@ KittiViewer.prototype = {
         if (this.imageIndexes.length != 0 && this.imageIndexes.includes(image_idx)) {
             let data = {};
             data["image_idx"] = image_idx;
+            data["with_gt"] = this.drawGT;
             data["with_det"] = this.drawDet;
             data["enable_int16"] = this.enableInt16;
             data["int16_factor"] = this.int16Factor;
@@ -240,7 +244,7 @@ KittiViewer.prototype = {
                         var points = new Float32Array(points_buf);
                     }
                     var numFeatures = response["num_features"];
-                    if ("locs" in response){
+                    if (self.drawGT && "locs" in response){
                         var locs = response["locs"];
                         var dims = response["dims"];
     
@@ -250,7 +254,7 @@ KittiViewer.prototype = {
                         self.gtBoxes = boxEdgeWithLabel(dims, locs, rots, 2,
                             self.gtBoxColor, labels,
                             self.gtLabelColor);
-                        // var boxes = boxEdge(dims, locs, rots, 2, "rgb(0, 255, 0)");
+                        var boxes = boxEdge(dims, locs, rots, 2, "rgb(0, 255, 0)");
                         for (var i = 0; i < self.gtBoxes.length; ++i) {
                             scene.add(self.gtBoxes[i]);
                         }
@@ -262,13 +266,30 @@ KittiViewer.prototype = {
                         var rots = response["dt_rots"];
                         var scores = response["dt_scores"];
                         self.dtBboxes = response["dt_bbox"];
+
+                        locs = locs.filter((_, i) => scores[i] > self.detThreshold);
+                        dims = dims.filter((_, i) => scores[i] > self.detThreshold);
+                        rots = rots.filter((_, i) => scores[i] > self.detThreshold);
+                        scores = scores.filter((_, i) => scores[i] > self.detThreshold);
                         console.log("draw det", dims.length);
                         let label_with_score = [];
                         for (var i = 0; i < locs.length; ++i) {
-                            label_with_score.push("score=" + scores[i].toFixed(2).toString());
+                            if (self.applyJetCMap)
+                                label_with_score.push("");
+                            else
+                                label_with_score.push("score=" + scores[i].toFixed(2).toString());
                         }
                         
-                        self.dtBoxes = boxEdgeWithLabel(dims, locs, rots, 2, self.dtBoxColor,
+                        var colors;
+                        if (self.applyJetCMap) {
+                            colors = [];
+                            for (var i = 0; i < locs.length; ++i) {
+                                colors.push(CMJet[Math.floor(scores[i] * 255)]);
+                            }
+                        } else {
+                            colors = self.dtBoxColor;
+                        }
+                        self.dtBoxes = boxEdgeWithLabel(dims, locs, rots, 2, colors,
                             label_with_score, self.dtLabelColor);
                         for (var i = 0; i < self.dtBoxes.length; ++i) {
                             scene.add(self.dtBoxes[i]);

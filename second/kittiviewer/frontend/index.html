@@ -33,6 +33,7 @@
     <script src="js/MapControls.js"></script>
     <script src="js/SimplePlot.js"></script>
     <script src="js/Toast.js"></script>
+    <script src="js/ColorMap.js"></script>
     <script src="js/KittiViewer.js"></script>
     <script src="js/renderers/CSS2DRenderer.js"></script>
     <script src="js/shaders/ConvolutionShader.js"></script>
@@ -236,7 +237,7 @@
 
         var postParams = {
             exposure: 1,
-            bloomStrength: 1.5,
+            bloomStrength: 1.0,
             bloomThreshold: 0,
             bloomRadius: 0
         };
@@ -311,7 +312,10 @@
             CookiesKitti.set('kittiviewer_detPath', value);
         });
         kittiGui.add(viewer, "loadDet");
+        kittiGui.add(viewer, "drawGT");
         kittiGui.add(viewer, "drawDet");
+        kittiGui.add(viewer, "applyJetCMap");
+        kittiGui.add(viewer, "detThreshold", 0.0, 1.0);
         kittiGui.add(viewer, "checkpointPath").onChange(function (value) {
             viewer.checkpointPath = value;
             CookiesKitti.set('kittiviewer_checkpointPath', value);

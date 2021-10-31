@@ -37,11 +37,18 @@ function boxEdge(dims, pos, rots, edgewidth, color) {
 
 function boxEdgeWithLabel(dims, locs, rots, edgewidth, color, labels, lcolor) {
     let boxes = [];
+    if (!Array.isArray(color)) {
+        color = new Array(dims.length).fill(color);
+    }
+    if (!Array.isArray(lcolor)) {
+        lcolor = new Array(dims.length).fill(lcolor);
+    }
     for (var i = 0; i < dims.length; ++i) {
         let cube = new THREE.BoxGeometry(dims[i][0], dims[i][1], dims[i][2]);
         var edgeGeo = new THREE.EdgesGeometry(cube);
+        console.log(color[i]);
         let material = new THREE.LineBasicMaterial({
-            color: color,
+            color: color[i],
             linewidth: edgewidth
         });
         let edges = new THREE.LineSegments(edgeGeo, material);
@@ -51,7 +58,7 @@ function boxEdgeWithLabel(dims, locs, rots, edgewidth, color, labels, lcolor) {
         var labelDiv = document.createElement( 'div' );
         labelDiv.className = 'label';
         labelDiv.textContent = labels[i];
-        labelDiv.style.color = lcolor;
+        labelDiv.style.color = lcolor[i];
         // labelDiv.style.marginTop = '-1em';
         labelDiv.style.fontSize = "150%";
         var labelObj = new THREE.CSS2DObject( labelDiv );

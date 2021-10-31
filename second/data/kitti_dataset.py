@@ -241,7 +241,7 @@ class KittiDataset(Dataset):
             velo_path = Path(self._root_path) / pc_info['velodyne_path']
         velo_reduced_path = velo_path.parent.parent / (
             velo_path.parent.stem + '_reduced') / velo_path.name
-        if velo_reduced_path.exists():
+        if False and velo_reduced_path.exists():
             velo_path = velo_reduced_path
         points = np.fromfile(
             str(velo_path), dtype=np.float32,

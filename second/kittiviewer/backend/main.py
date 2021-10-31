@@ -96,7 +96,7 @@ def get_pointcloud():
     sensor_data = BACKEND.dataset.get_sensor_data(idx)
 
     # img_shape = image_info["image_shape"] # hw
-    if 'annotations' in sensor_data["lidar"]:
+    if instance["with_gt"] and 'annotations' in sensor_data["lidar"]:
         annos = sensor_data["lidar"]['annotations']
         gt_boxes = annos["boxes"].copy()
         response["locs"] = gt_boxes[:, :3].tolist()
@@ -104,6 +104,7 @@ def get_pointcloud():
         rots = np.concatenate([np.zeros([gt_boxes.shape[0], 2], dtype=np.float32), -gt_boxes[:, 6:7]], axis=1)
         response["rots"] = rots.tolist()
         response["labels"] = annos["names"].tolist()
+        print(response["labels"])
     # response["num_features"] = sensor_data["lidar"]["points"].shape[1]
     response["num_features"] = 3
     points = sensor_data["lidar"]["points"][:, :3]
@@ -113,6 +114,18 @@ def get_pointcloud():
         points = points.astype(np.int16)
     pc_str = base64.b64encode(points.tobytes())
     response["pointcloud"] = pc_str.decode("utf-8")
+
+    if instance["with_det"]:
+        pred = BACKEND.dt_annos[idx]
+        box3d = pred["box3d_lidar"].detach().cpu().numpy()
+        locs = box3d[:, :3]
+        dims = box3d[:, 3:6]
+        rots = np.concatenate([np.zeros([locs.shape[0], 2], dtype=np.float32), -box3d[:, 6:7]], axis=1)
+        response["dt_locs"] = locs.tolist()
+        response["dt_dims"] = dims.tolist()
+        response["dt_rots"] = rots.tolist()
+        response["dt_labels"] = pred["label_preds"].detach().cpu().numpy().tolist()
+        response["dt_scores"] = pred["scores"].detach().cpu().numpy().tolist()
 
     # if "score" in annos:
     #     response["score"] = score.tolist()
