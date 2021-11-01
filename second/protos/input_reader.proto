@@ -35,6 +35,7 @@ message InputReader {
     bool random_flip_x = 20;
     bool random_flip_y = 21;
     float sample_importance = 22;
+    bool remove_outside_points = 23;
   }
   Preprocess preprocess = 3;
   uint32 max_num_epochs = 4; // deprecated

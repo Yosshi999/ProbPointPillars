@@ -32,6 +32,12 @@ class KittiDataset(Dataset):
         print("remain number of infos:", len(self._kitti_infos))
         self._class_names = class_names
         self._prep_func = prep_func
+        if prep_func is None:
+            self.remove_outside_points = True
+        else:
+            self.remove_outside_points = prep_func.keywords["remove_outside_points"]
+            if self.remove_outside_points:
+                prep_func.keywords["remove_outside_points"] = False
 
     def __len__(self):
         return len(self._kitti_infos)
@@ -239,10 +245,11 @@ class KittiDataset(Dataset):
         velo_path = Path(pc_info['velodyne_path'])
         if not velo_path.is_absolute():
             velo_path = Path(self._root_path) / pc_info['velodyne_path']
-        velo_reduced_path = velo_path.parent.parent / (
-            velo_path.parent.stem + '_reduced') / velo_path.name
-        if False and velo_reduced_path.exists():
-            velo_path = velo_reduced_path
+        if self.remove_outside_points:
+            velo_reduced_path = velo_path.parent.parent / (
+                velo_path.parent.stem + '_reduced') / velo_path.name
+            if velo_reduced_path.exists():
+                velo_path = velo_reduced_path
         points = np.fromfile(
             str(velo_path), dtype=np.float32,
             count=-1).reshape([-1, self.NumPointFeatures])

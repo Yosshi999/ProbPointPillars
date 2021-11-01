@@ -35,13 +35,14 @@ endif
 		python create_data.py kitti_data_prep --root_path=$(KITTI_DATASET_ROOT)
 
 CONF := pointpillars/car/xyres_16.config
-EXP := pointpillars-car-xyres_16
+EXP := $(subst .config,,$(subst /,-,$(CONF)))
 .PHONY: train
 train:
 ifndef KITTI_DATASET_ROOT
 	echo "argument KITTI_DATASET_ROOT is not defined"
 	exit 1
 endif
+	echo CONF:$(CONF), EXP:$(EXP)
 	docker run --rm -it --gpus all \
 		-v /hdd/kitti:/app/data \
 		-v $(MAKEFILE_DIR)/model:/app/model \

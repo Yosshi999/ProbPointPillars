@@ -170,6 +170,8 @@ def prep_pointcloud(input_dict,
         masks = points_in_convex_polygon_3d_jit(points, surfaces)
         points = points[masks.any(-1)]
 
+    # In kitti dataset, point will be reduced in loading time and this option is forced to be false
+    # See second/data/kitti_dataset.py#L35,L245
     if remove_outside_points:
         assert calib is not None
         image_shape = input_dict["image"]["image_shape"]
