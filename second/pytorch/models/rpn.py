@@ -345,6 +345,7 @@ class RPNBase(RPNNoHeadBase):
                  encode_background_as_zeros=True,
                  use_direction_classifier=True,
                  use_groupnorm=False,
+                 estimate_box_logvariance=False,
                  num_groups=32,
                  box_code_size=7,
                  num_direction_bins=2,
@@ -373,6 +374,7 @@ class RPNBase(RPNNoHeadBase):
         self._num_direction_bins = num_direction_bins
         self._num_class = num_class
         self._use_direction_classifier = use_direction_classifier
+        self._estimate_box_logvariance = estimate_box_logvariance
         self._box_code_size = box_code_size
 
         if encode_background_as_zeros:
@@ -389,6 +391,9 @@ class RPNBase(RPNNoHeadBase):
         if use_direction_classifier:
             self.conv_dir_cls = nn.Conv2d(
                 final_num_filters, num_anchor_per_loc * num_direction_bins, 1)
+        if estimate_box_logvariance:
+            self.conv_box_logvar = nn.Conv2d(
+                final_num_filters, num_anchor_per_loc * box_code_size, 1)
 
     def forward(self, x):
         res = super().forward(x)
@@ -417,6 +422,12 @@ class RPNBase(RPNNoHeadBase):
                 W).permute(0, 1, 3, 4, 2).contiguous()
             # dir_cls_preds = dir_cls_preds.permute(0, 2, 3, 1).contiguous()
             ret_dict["dir_cls_preds"] = dir_cls_preds
+        if self._estimate_box_logvariance:
+            box_logvar_preds = self.conv_box_logvar(x)
+            box_logvar_preds = box_logvar_preds.view(
+                -1, self._num_anchor_per_loc, self._box_code_size, H, W
+                ).permute(0, 1, 3, 4, 2).contiguous()
+            ret_dict["box_logvar_preds"] = box_logvar_preds
         return ret_dict
 
 
