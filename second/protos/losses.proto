@@ -30,8 +30,9 @@ message LocalizationLoss {
     WeightedSmoothL1LocalizationLoss weighted_smooth_l1 = 2;
     WeightedGHMLocalizationLoss weighted_ghm = 3;
     WeightedSmoothL1LocalizationLoss weighted_smooth_l1_with_uncertainty = 4;
+    WeightedSmoothL1LocalizationLoss weighted_smooth_l1_and_von_mises_with_uncertainty = 5;
   }
-  bool encode_rad_error_by_sin = 5;
+  bool encode_rad_error_by_sin = 6;
 }
 
 // L2 location loss: 0.5 * ||weight * (a - b)|| ^ 2

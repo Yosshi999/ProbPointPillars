@@ -61,7 +61,7 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
 # ==================================================================
 # pytorch
 # ------------------------------------------------------------------
-    $PIP_INSTALL torch torchvision && \
+    $PIP_INSTALL "torch>=1.10" torchvision && \
 # ==================================================================
 # config & cleanup
 # ------------------------------------------------------------------
@@ -81,7 +81,7 @@ RUN tar xzvf boost_1_76_0.tar.gz
 RUN cp -r ./boost_1_76_0/boost /usr/include
 RUN rm -rf ./boost_1_76_0
 RUN rm -rf ./boost_1_76_0.tar.gz
-RUN git clone https://github.com/traveller59/spconv.git --depth 10 --recursive
+RUN git clone https://github.com/traveller59/spconv.git --recursive
 
 RUN wget https://github.com/Kitware/CMake/releases/download/v3.21.1/cmake-3.21.1.tar.gz
 RUN tar zxvf cmake-3.21.1.tar.gz
@@ -97,7 +97,7 @@ RUN rm -rf ./cmake-3.21.1.tar.gz
 # ==================================================================
 ARG TORCH_CUDA_ARCH_LIST="7.5+PTX"
 ENV SPCONV_FORCE_BUILD_CUDA 1
-RUN cd ./spconv && python setup.py bdist_wheel && pip install ./dist/spconv*.whl
+RUN cd ./spconv && git checkout fad3000 && git submodule update --recursive && python setup.py bdist_wheel && pip install ./dist/spconv*.whl
 ENV NUMBAPRO_CUDA_DRIVER=/usr/lib/x86_64-linux-gnu/libcuda.so
 ENV NUMBAPRO_NVVM=/usr/local/cuda/nvvm/lib64/libnvvm.so
 ENV NUMBAPRO_LIBDEVICE=/usr/local/cuda/nvvm/libdevice

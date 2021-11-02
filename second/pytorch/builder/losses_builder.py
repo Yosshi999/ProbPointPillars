@@ -114,6 +114,13 @@ def _build_localization_loss(loss_config):
     else:
       code_weight = config.code_weight
     return losses.WeightedSmoothL1LocalizationLossWithUncertainty(config.sigma, code_weight)
+  if loss_type == 'weighted_smooth_l1_and_von_mises_with_uncertainty':
+    config = loss_config.weighted_smooth_l1_and_von_mises_with_uncertainty
+    if len(config.code_weight) == 0:
+      code_weight = None
+    else:
+      code_weight = config.code_weight
+    return losses.WeightedSmoothL1LocalizationAndVonMisesLossWithUncertainty(config.sigma, code_weight)
   if loss_type == 'weighted_smooth_l1':
     config = loss_config.weighted_smooth_l1
     if len(config.code_weight) == 0:
