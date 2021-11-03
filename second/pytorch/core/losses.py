@@ -13,6 +13,7 @@ from abc import ABCMeta, abstractmethod
 
 import numpy as np
 import torch
+import torch.special
 from torch import nn
 from torch.autograd import Variable
 from torch.nn import functional as F
@@ -220,15 +221,19 @@ class WeightedSmoothL1LocalizationAndVonMisesLossWithUncertainty(WeightedSmoothL
       + (abs_diff - 0.5 / (self._sigma**2)) * (1. - abs_diff_lt_1)
 
     # add uncertainty loss: 1 / sigma^2 * Loss + 1/2 * log(sigma^2) + 1/2 * log(2pi)
-    invvars = torch.exp(-logvars * 0.1) # scaling to avoid nan
-    loss = invvars * loss + 0.5 * logvars + 0.5 * np.log(2*np.pi)
+    invvars = torch.exp(-logvars)
+    loss = invvars * loss + 0.5 * logvars
 
     # von Mises
     prediction_angle = prediction_tensor[..., 6:7]
     target_angle = target_tensor[..., 6:7]
     m = invvars[..., 6:7]
-    nll_angle = np.log(2*np.pi) + torch.log(torch.i0(m)) - m * torch.cos(prediction_angle - target_angle)
-      # + torch.nn.functional.elu(m - 1.0) # regularization (https://arxiv.org/abs/2011.02553)
+
+    # nll_angle = torch.log(torch.i0(m)) - m * torch.cos(prediction_angle - target_angle)
+    #  = torch.log(torch.i0(m)) - m - m * (-1 + torch.cos(prediction_angle - target_angle))
+    #  = torch.log(torch.i0(m)exp(-m)) - m * (-1 + torch.cos(prediction_angle - target_angle))
+    nll_angle = torch.log(torch.special.i0e(m)) - m * (-1 + torch.cos(prediction_angle - target_angle))
+    # nll_angle += torch.nn.functional.elu(m - 1.0) # regularization (https://arxiv.org/abs/2011.02553)
 
     loss = torch.cat([loss[..., :6], nll_angle, loss[..., 7:]], dim=-1)
 
