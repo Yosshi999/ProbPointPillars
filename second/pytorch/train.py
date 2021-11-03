@@ -315,6 +315,9 @@ def train(config_path,
                 loc_unc_reduced = ret_dict.get("loc_unc_preds_reduced", None)
                 dim_unc_reduced = ret_dict.get("dim_unc_preds_reduced", None)
                 rot_unc_reduced = ret_dict.get("rot_unc_preds_reduced", None)
+                loc_unc = ret_dict.get("loc_unc_preds", None)
+                dim_unc = ret_dict.get("dim_unc_preds", None)
+                rot_unc = ret_dict.get("rot_unc_preds", None)
                 
                 cared = ret_dict["cared"]
                 labels = example_torch["labels"]
@@ -379,6 +382,9 @@ def train(config_path,
                         "mem_usage": psutil.virtual_memory().percent,
                     }
                     model_logging.log_metrics(metrics, global_step)
+                    model_logging.summary_writter.add_histogram("uncertainty/rpn_loc_uncertainty", loc_unc, global_step)
+                    model_logging.summary_writter.add_histogram("uncertainty/rpn_dim_uncertainty", dim_unc, global_step)
+                    model_logging.summary_writter.add_histogram("uncertainty/rpn_rot_uncertainty", rot_unc, global_step)
 
                 if global_step % steps_per_eval == 0:
                     torchplus.train.save_models(model_dir, [net, amp_optimizer],
