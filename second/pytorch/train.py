@@ -382,9 +382,9 @@ def train(config_path,
                         "mem_usage": psutil.virtual_memory().percent,
                     }
                     model_logging.log_metrics(metrics, global_step)
-                    model_logging.summary_writter.add_histogram("uncertainty/rpn_loc_uncertainty", loc_unc, global_step)
-                    model_logging.summary_writter.add_histogram("uncertainty/rpn_dim_uncertainty", dim_unc, global_step)
-                    model_logging.summary_writter.add_histogram("uncertainty/rpn_rot_uncertainty", rot_unc, global_step)
+                    model_logging.summary_writter.add_histogram("histogram/rpn_loc_uncertainty", loc_unc, global_step)
+                    model_logging.summary_writter.add_histogram("histogram/rpn_dim_uncertainty", dim_unc, global_step)
+                    model_logging.summary_writter.add_histogram("histogram/rpn_rot_uncertainty", rot_unc, global_step)
 
                 if global_step % steps_per_eval == 0:
                     torchplus.train.save_models(model_dir, [net, amp_optimizer],
