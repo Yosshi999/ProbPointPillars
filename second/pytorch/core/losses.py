@@ -211,7 +211,11 @@ class WeightedSmoothL1LocalizationAndVonMisesLossWithUncertainty(WeightedSmoothL
       loss: a float tensor of shape [batch_size, num_anchors] tensor
         representing the value of the loss function.
     """
-    diff = prediction_tensor - target_tensor
+    diff = torch.cat([
+      prediction_tensor[..., :6] - target_tensor[..., :6],
+      1.0 - torch.cos(prediction_tensor[..., 6:7] - target_tensor[..., 6:7]),
+      prediction_tensor[..., 7:] - target_tensor[..., 7:]
+    ], dim=-1)
     abs_diff = torch.abs(diff)
     if self._code_weights is not None:
       code_weights = self._code_weights.type_as(prediction_tensor).to(target_tensor.device)
@@ -222,20 +226,18 @@ class WeightedSmoothL1LocalizationAndVonMisesLossWithUncertainty(WeightedSmoothL
 
     # add uncertainty loss: 1 / sigma^2 * Loss + 1/2 * log(sigma^2) + 1/2 * log(2pi)
     invvars = torch.exp(-logvars)
-    loss = invvars * loss + 0.5 * logvars
+    uncloss = 0.5 * logvars
 
     # von Mises
-    prediction_angle = prediction_tensor[..., 6:7]
-    target_angle = target_tensor[..., 6:7]
     m = invvars[..., 6:7]
 
     # nll_angle = torch.log(torch.i0(m)) - m * torch.cos(prediction_angle - target_angle)
     #  = torch.log(torch.i0(m)) - m - m * (-1 + torch.cos(prediction_angle - target_angle))
-    #  = torch.log(torch.i0(m)exp(-m)) - m * (-1 + torch.cos(prediction_angle - target_angle))
-    nll_angle = torch.log(torch.special.i0e(m)) - m * (-1 + torch.cos(prediction_angle - target_angle))
+    #  = torch.log(torch.i0(m)exp(-m)) + m * (1 - torch.cos(prediction_angle - target_angle))
+    uncloss_angle = torch.log(torch.special.i0e(m))
     # nll_angle += torch.nn.functional.elu(m - 1.0) # regularization (https://arxiv.org/abs/2011.02553)
 
-    loss = torch.cat([loss[..., :6], nll_angle, loss[..., 7:]], dim=-1)
+    loss = invvars * loss + torch.cat([uncloss[..., :6], uncloss_angle, uncloss[..., 7:]], dim=-1)
 
     if self._codewise:
       anchorwise_smooth_l1norm = loss
