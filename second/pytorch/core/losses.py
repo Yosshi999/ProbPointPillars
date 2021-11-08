@@ -235,7 +235,7 @@ class WeightedSmoothL1LocalizationAndVonMisesLossWithUncertainty(WeightedSmoothL
     #  = torch.log(torch.i0(m)) - m - m * (-1 + torch.cos(prediction_angle - target_angle))
     #  = torch.log(torch.i0(m)exp(-m)) + m * (1 - torch.cos(prediction_angle - target_angle))
     uncloss_angle = torch.log(torch.special.i0e(m))
-    # nll_angle += torch.nn.functional.elu(m - 1.0) # regularization (https://arxiv.org/abs/2011.02553)
+    uncloss_angle += torch.nn.functional.elu(logvars[..., 6:7] - 1.0) # regularization (https://arxiv.org/abs/2011.02553)
 
     loss = invvars * loss + torch.cat([uncloss[..., :6], uncloss_angle, uncloss[..., 7:]], dim=-1)
 
