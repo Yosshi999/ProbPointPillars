@@ -330,6 +330,9 @@ class VoxelNet(nn.Module):
             res["loc_unc_preds"] = box_vars_weighted[..., 0:3]
             res["dim_unc_preds"] = box_vars_weighted[..., 3:6]
             res["rot_unc_preds"] = box_vars_weighted[..., 6:7]
+            res["loc_logvar_preds"] = box_logvar_preds[..., 0:3]
+            res["dim_logvar_preds"] = box_logvar_preds[..., 3:6]
+            res["rot_logvar_preds"] = box_logvar_preds[..., 6:7]
         return res
 
     def network_forward(self, voxels, num_points, coors, batch_size):

@@ -318,6 +318,9 @@ def train(config_path,
                 loc_unc = ret_dict.get("loc_unc_preds", None)
                 dim_unc = ret_dict.get("dim_unc_preds", None)
                 rot_unc = ret_dict.get("rot_unc_preds", None)
+                loc_logvar = ret_dict.get("loc_logvar_preds", None)
+                dim_logvar = ret_dict.get("dim_logvar_preds", None)
+                rot_logvar = ret_dict.get("rot_logvar_preds", None)
                 
                 cared = ret_dict["cared"]
                 labels = example_torch["labels"]
@@ -327,6 +330,7 @@ def train(config_path,
                 else:
                     loss.backward()
                 torch.nn.utils.clip_grad_norm_(net.parameters(), 10.0)
+                torch.nn.utils.clip_grad_norm_(net.rpn.conv_box_logvar.parameters(), 1.0)
                 amp_optimizer.step()
                 amp_optimizer.zero_grad()
                 net.update_global_step()
@@ -385,6 +389,9 @@ def train(config_path,
                     model_logging.summary_writter.add_histogram("histogram/rpn_loc_uncertainty", loc_unc, global_step)
                     model_logging.summary_writter.add_histogram("histogram/rpn_dim_uncertainty", dim_unc, global_step)
                     model_logging.summary_writter.add_histogram("histogram/rpn_rot_uncertainty", rot_unc, global_step)
+                    model_logging.summary_writter.add_histogram("histogram/rpn_loc_logvar", loc_logvar, global_step)
+                    model_logging.summary_writter.add_histogram("histogram/rpn_dim_logvar", dim_logvar, global_step)
+                    model_logging.summary_writter.add_histogram("histogram/rpn_rot_logvar", rot_logvar, global_step)
 
                 if global_step % steps_per_eval == 0:
                     torchplus.train.save_models(model_dir, [net, amp_optimizer],
