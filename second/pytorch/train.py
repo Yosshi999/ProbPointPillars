@@ -427,7 +427,7 @@ def train(config_path,
                         model_logging.log_text(v, global_step)
                     model_logging.log_metrics(result_dict["detail"], global_step)
                     with open(result_path_step / "result.pkl", 'wb') as f:
-                        pickle.dump(detections, f)
+                        pickle.dump([{k: (v.cpu() if k != "metadata" else v) for k, v in det.items()} for det in detections], f)
                     net.train()
                 step += 1
                 if step >= total_step:
@@ -553,7 +553,7 @@ def evaluate(config_path,
     for name, val in net.get_avg_time_dict().items():
         print(f"avg {name} time = {val * 1000:.3f} ms")
     with open(result_path_step / "result.pkl", 'wb') as f:
-        pickle.dump(detections, f)
+        pickle.dump([{k: (v.cpu() if k != "metadata" else v) for k, v in det.items()} for det in detections], f)
     result_dict = eval_dataset.dataset.evaluation(detections,
                                                   str(result_path_step))
     if result_dict is not None:
