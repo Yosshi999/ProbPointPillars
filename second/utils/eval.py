@@ -214,6 +214,7 @@ def compute_statistics_jit(overlaps,
     delta = np.zeros((gt_size, ))
     delta_idx = 0
     det_results = np.zeros((det_size, )) # -1: fp, 0: ignore, 1: tp
+    assigned_gt_index = np.full((det_size,), -1)
     for i in range(gt_size):
         if ignored_gt[i] == -1:
             continue
@@ -259,6 +260,7 @@ def compute_statistics_jit(overlaps,
             # only a tp add a threshold.
             tp += 1
             det_results[det_idx] = 1
+            assigned_gt_index[det_idx] = i
             # thresholds.append(dt_scores[det_idx])
             thresholds[thresh_idx] = dt_scores[det_idx]
             thresh_idx += 1
@@ -302,7 +304,7 @@ def compute_statistics_jit(overlaps,
             else:
                 similarity = -1
 
-    return tp, fp, fn, similarity, thresholds[:thresh_idx], det_results
+    return tp, fp, fn, similarity, thresholds[:thresh_idx], det_results, assigned_gt_index
 
 
 def get_split_parts(num, num_part):
@@ -342,7 +344,7 @@ def fused_compute_statistics(overlaps,
             ignored_gt = ignored_gts[gt_num:gt_num + gt_nums[i]]
             ignored_det = ignored_dets[dt_num:dt_num + dt_nums[i]]
             dontcare = dontcares[dc_num:dc_num + dc_nums[i]]
-            tp, fp, fn, similarity, _, _ = compute_statistics_jit(
+            tp, fp, fn, similarity, _, _, _ = compute_statistics_jit(
                 overlap,
                 gt_data,
                 dt_data,
@@ -547,7 +549,7 @@ def eval_class_v3(gt_annos,
                         min_overlap=min_overlap,
                         thresh=0.0,
                         compute_fp=False)
-                    tp, fp, fn, similarity, thresholds, _ = rets
+                    tp, fp, fn, similarity, thresholds, _, _ = rets
                     thresholdss += thresholds.tolist()
                 thresholdss = np.array(thresholdss)
                 thresholds = get_thresholds(thresholdss, total_num_valid_gt)
@@ -709,7 +711,7 @@ def do_eval_v3(gt_annos,
                 gt_annos, dt_annos, current_classes[0], difficulty
             )
             for i in range(len(gt_annos)):
-                tp, fp, _, _, _, det_results = compute_statistics_jit(
+                tp, fp, _, _, _, det_results, assigned_gt_index = compute_statistics_jit(
                     overlaps[i],
                     gt_datas_list[i],
                     dt_datas_list[i],
@@ -722,6 +724,7 @@ def do_eval_v3(gt_annos,
                     compute_fp=True)
                 dt_annos[i][f"official/overlaps"] = overlaps[i]
                 dt_annos[i][f"official/3d_0.70/{l}/bin"] = det_results
+                dt_annos[i][f"official/3d_0.70/{l}/assigned_gt"] = assigned_gt_index
                 dt_annos[i][f"official/3d_0.70/{l}/tp"] = tp
                 dt_annos[i][f"official/3d_0.70/{l}/fp"] = fp
                 assert len(dt_annos[i]["bbox"]) == len(det_results)
