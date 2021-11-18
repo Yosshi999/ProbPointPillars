@@ -78,6 +78,7 @@ class KittiDataset(Dataset):
                 maxxy = np.max(box_corners_in_image, axis=1)
                 bbox = np.concatenate([minxy, maxxy], axis=1)
             anno = kitti.get_start_result_anno()
+            anno["raw_detection_index"] = []
             num_example = 0
             box3d_lidar = final_box_preds
             for j in range(box3d_lidar.shape[0]):
@@ -102,6 +103,7 @@ class KittiDataset(Dataset):
                 anno["truncated"].append(0.0)
                 anno["occluded"].append(0)
                 anno["score"].append(scores[j])
+                anno["raw_detection_index"].append(j)
 
                 num_example += 1
             if num_example != 0:
