@@ -443,6 +443,15 @@ class VoxelNet(nn.Module):
         else:
             batch_dir_preds = [None] * batch_size
 
+        if self._estimate_box_logvariance:
+            batch_box_vars = torch.exp(
+                preds_dict["box_logvar_preds"].view(
+                    batch_size, -1, self._box_coder.code_size
+                )
+            )
+        else:
+            batch_box_vars = [None] * batch_size
+
         predictions_dicts = []
         post_center_range = None
         if len(self._post_center_range) > 0:
@@ -450,11 +459,12 @@ class VoxelNet(nn.Module):
                 self._post_center_range,
                 dtype=batch_box_preds.dtype,
                 device=batch_box_preds.device).float()
-        for box_preds, cls_preds, dir_preds, a_mask, meta in zip(
-                batch_box_preds, batch_cls_preds, batch_dir_preds,
+        for box_preds, box_vars, cls_preds, dir_preds, a_mask, meta in zip(
+                batch_box_preds, batch_box_vars, batch_cls_preds, batch_dir_preds,
                 batch_anchors_mask, meta_list):
             if a_mask is not None:
                 box_preds = box_preds[a_mask]
+                box_vars = box_vars[a_mask]
                 cls_preds = cls_preds[a_mask]
             box_preds = box_preds.float()
             cls_preds = cls_preds.float()
@@ -588,6 +598,7 @@ class VoxelNet(nn.Module):
                 if top_scores.shape[0] != 0:
                     if self._nms_score_thresholds[0] > 0.0:
                         box_preds = box_preds[top_scores_keep]
+                        box_vars = box_vars[top_scores_keep]
                         if self._use_direction_classifier:
                             dir_labels = dir_labels[top_scores_keep]
                         top_labels = top_labels[top_scores_keep]
@@ -614,9 +625,11 @@ class VoxelNet(nn.Module):
                     selected_dir_labels = dir_labels[selected]
                 selected_labels = top_labels[selected]
                 selected_scores = top_scores[selected]
+                selected_vars = box_vars[selected]
             # finally generate predictions.
             if selected_boxes.shape[0] != 0:
                 box_preds = selected_boxes
+                box_vars = selected_vars
                 scores = selected_scores
                 label_preds = selected_labels
                 if self._use_direction_classifier:
@@ -630,6 +643,7 @@ class VoxelNet(nn.Module):
                         6] = dir_rot + self._dir_offset + period * dir_labels.to(
                             box_preds.dtype)
                 final_box_preds = box_preds
+                final_box_vars = box_vars
                 final_scores = scores
                 final_labels = label_preds
                 if post_center_range is not None:
@@ -643,6 +657,8 @@ class VoxelNet(nn.Module):
                         "label_preds": label_preds[mask],
                         "metadata": meta,
                     }
+                    if self._estimate_box_logvariance:
+                        predictions_dict["boxvariance_lidar"] = final_box_vars[mask]
                 else:
                     predictions_dict = {
                         "box3d_lidar": final_box_preds,
@@ -650,6 +666,8 @@ class VoxelNet(nn.Module):
                         "label_preds": label_preds,
                         "metadata": meta,
                     }
+                    if self._estimate_box_logvariance:
+                        predictions_dict["boxvariance_lidar"] = final_box_vars
             else:
                 dtype = batch_box_preds.dtype
                 device = batch_box_preds.device
@@ -665,6 +683,12 @@ class VoxelNet(nn.Module):
                     "metadata":
                     meta,
                 }
+                if self._estimate_box_logvariance:
+                    predictions_dict["boxvariance_lidar"] = torch.zeros(
+                        [0, box_vars.shape[-1]],
+                        dtype=dtype,
+                        device=device
+                    )
             predictions_dicts.append(predictions_dict)
         return predictions_dicts
 
