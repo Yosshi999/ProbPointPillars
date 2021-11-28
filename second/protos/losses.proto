@@ -31,8 +31,9 @@ message LocalizationLoss {
     WeightedGHMLocalizationLoss weighted_ghm = 3;
     WeightedSmoothL1LocalizationLoss weighted_smooth_l1_with_uncertainty = 4;
     WeightedSmoothL1LocalizationLoss weighted_smooth_l1_and_von_mises_with_uncertainty = 5;
+    LaplacianKLWithUncertainty laplacian_kl_with_uncertainty = 6;
   }
-  bool encode_rad_error_by_sin = 6;
+  bool encode_rad_error_by_sin = 7;
 }
 
 // L2 location loss: 0.5 * ||weight * (a - b)|| ^ 2
@@ -59,6 +60,10 @@ message WeightedGHMLocalizationLoss {
   int32 bins = 3;
   float momentum = 4;
   repeated float code_weight = 5;
+}
+message LaplacianKLWithUncertainty {
+  float label_noise = 1;
+  repeated float code_weight = 2;
 }
 
 

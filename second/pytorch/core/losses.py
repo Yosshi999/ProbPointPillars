@@ -182,6 +182,63 @@ class WeightedSmoothL1LocalizationLoss(Loss):
         anchorwise_smooth_l1norm *= weights
     return anchorwise_smooth_l1norm
 
+class LaplacianKLWithUncertainty(Loss):
+  """KL Divergence between Laplacian distributions.
+  From "Learning an Uncertainty-Aware Object Detector for Autonomous Driving," Mayer et al., 2019
+  """
+  def __init__(self, label_noise=0.01, code_weights=None, encode_rad_error_by_sin=False, codewise=True):
+    super().__init__()
+    self._label_noise = label_noise
+    self._log_label_noise = np.log(label_noise)
+    self._encode_rad = encode_rad_error_by_sin
+    if code_weights is not None:
+      self._code_weights = np.array(code_weights, dtype=np.float32)
+      self._code_weights = torch.from_numpy(self._code_weights)
+    else:
+      self._code_weights = None
+    self._codewise = codewise
+  def _compute_loss(self, prediction_tensor, target_tensor, logvars=None, weights=None):
+    """Compute loss function.
+
+    Args:
+      prediction_tensor: A float tensor of shape [batch_size, num_anchors,
+        code_size] representing the (encoded) predicted locations of objects.
+      target_tensor: A float tensor of shape [batch_size, num_anchors,
+        code_size] representing the regression targets
+      weights: a float tensor of shape [batch_size, num_anchors]
+
+    Returns:
+      loss: a float tensor of shape [batch_size, num_anchors] tensor
+        representing the value of the loss function.
+    """
+    if self._encode_rad or prediction_tensor.shape[-1] == 8:
+      # encode_rad_error_by_sin == true or box_coder.ground_box3d_coder.encode_angle_vector == true
+      diff = prediction_tensor - target_tensor
+    else:
+      diff = torch.cat([
+        prediction_tensor[..., :6] - target_tensor[..., :6],
+        1.0 - torch.cos(prediction_tensor[..., 6:7] - target_tensor[..., 6:7]),
+        prediction_tensor[..., 7:] - target_tensor[..., 7:]
+      ], dim=-1)
+    abs_diff = torch.abs(diff)
+    if self._code_weights is not None:
+      code_weights = self._code_weights.type_as(prediction_tensor).to(target_tensor.device)
+      abs_diff = code_weights.view(1, 1, -1) * abs_diff
+
+    invvars = torch.exp(-logvars)
+    loss = (logvars - self._log_label_noise) + (
+      self._label_noise * torch.exp(-abs_diff / self._label_noise) + abs_diff
+    ) * invvars - 1
+
+    if self._codewise:
+      anchorwise_smooth_l1norm = loss
+      if weights is not None:
+        anchorwise_smooth_l1norm *= weights.unsqueeze(-1)
+    else:
+      anchorwise_smooth_l1norm = torch.sum(loss, 2)#  * weights
+      if weights is not None:
+        anchorwise_smooth_l1norm *= weights
+    return anchorwise_smooth_l1norm
 
 class WeightedSmoothL1LocalizationAndVonMisesLossWithUncertainty(WeightedSmoothL1LocalizationLoss):
   """Smooth L1 localization loss function with uncertainty.

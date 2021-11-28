@@ -330,7 +330,7 @@ def train(config_path,
                 else:
                     loss.backward()
                 torch.nn.utils.clip_grad_norm_(net.parameters(), 10.0)
-                torch.nn.utils.clip_grad_norm_(net.rpn.conv_box_logvar.parameters(), 1.0)
+                # torch.nn.utils.clip_grad_norm_(net.rpn.conv_box_logvar.parameters(), 1.0)
                 amp_optimizer.step()
                 amp_optimizer.zero_grad()
                 net.update_global_step()
