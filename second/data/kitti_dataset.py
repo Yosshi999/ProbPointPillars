@@ -4,6 +4,8 @@ import time
 from functools import partial
 
 import numpy as np
+from scipy.spatial import ConvexHull
+from scipy.spatial.qhull import QhullError
 from tqdm import tqdm
 
 from second.core import box_np_ops
@@ -187,16 +189,37 @@ class KittiDataset(Dataset):
             dims = annos['dimensions'][:num_obj]
             loc = annos['location'][:num_obj]
             rots = annos['rotation_y'][:num_obj]
-            gt_boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]],
+            det_boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]],
                                             axis=1)
-            gt_boxes_lidar = box_np_ops.box_camera_to_lidar(
-                gt_boxes_camera, rect, Trv2c)
-            indices = box_np_ops.points_in_rbbox(points_v[:, :3], gt_boxes_lidar)
-            num_points_in_gt = indices.sum(0)
+            det_boxes_lidar = box_np_ops.box_camera_to_lidar(
+                det_boxes_camera, rect, Trv2c)
+            indices = box_np_ops.points_in_rbbox(points_v[:, :3], det_boxes_lidar)
+            num_points_in_det = indices.sum(0)
             num_ignored = len(annos['dimensions']) - num_obj
-            num_points_in_gt = np.concatenate(
-                [num_points_in_gt, -np.ones([num_ignored])])
-            annos["num_points_in_det"] = num_points_in_gt.astype(np.int32)
+            num_points_in_det = np.concatenate(
+                [num_points_in_det, -np.ones([num_ignored])])
+            annos["num_points_in_det"] = num_points_in_det.astype(np.int32)
+
+            hull_volumes = []
+            hull_bev_areas = []
+            for i in range(num_obj):
+                try:
+                    if num_points_in_det[i] < 4:
+                        hull_volumes.append(0)
+                        hull_bev_areas.append(0)
+                        continue
+                    points_in_det_lidar = points_v[indices[:, i], :3]
+                    points_in_det_bev = points_in_det_lidar[:, :2]
+                    hull_lidar = ConvexHull(points_in_det_lidar)
+                    hull_bev = ConvexHull(points_in_det_bev)
+                    hull_volumes.append(hull_lidar.volume)
+                    hull_bev_areas.append(hull_bev.volume)
+                except QhullError:
+                    hull_volumes.append(0)
+                    hull_bev_areas.append(0)
+            annos["hull_volumes_in_det"] = np.concatenate([hull_volumes, -np.ones([num_ignored])])
+            annos["hull_bev_areas_in_det"] = np.concatenate([hull_bev_areas, -np.ones([num_ignored])])
+
 
         return {
             "results": {
