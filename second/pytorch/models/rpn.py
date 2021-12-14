@@ -346,6 +346,7 @@ class RPNBase(RPNNoHeadBase):
                  use_direction_classifier=True,
                  use_groupnorm=False,
                  estimate_box_logvariance=False,
+                 estimate_xy_correlation=False,
                  num_groups=32,
                  box_code_size=7,
                  num_direction_bins=2,
@@ -375,6 +376,7 @@ class RPNBase(RPNNoHeadBase):
         self._num_class = num_class
         self._use_direction_classifier = use_direction_classifier
         self._estimate_box_logvariance = estimate_box_logvariance
+        self._estimate_xy_correlation = estimate_xy_correlation
         self._box_code_size = box_code_size
 
         if encode_background_as_zeros:
@@ -394,6 +396,9 @@ class RPNBase(RPNNoHeadBase):
         if estimate_box_logvariance:
             self.conv_box_logvar = nn.Conv2d(
                 final_num_filters, num_anchor_per_loc * box_code_size, 1)
+        if estimate_xy_correlation:
+            self.conv_xy_corr = nn.Conv2d(
+                final_num_filters, num_anchor_per_loc * 1, 1)
 
     def forward(self, x):
         res = super().forward(x)
@@ -428,6 +433,13 @@ class RPNBase(RPNNoHeadBase):
                 -1, self._num_anchor_per_loc, self._box_code_size, H, W
                 ).permute(0, 1, 3, 4, 2).contiguous()
             ret_dict["box_logvar_preds"] = box_logvar_preds
+        if self._estimate_xy_correlation:
+            box_xy_correlation = self.conv_xy_corr(x)
+            box_xy_correlation = box_xy_correlation.view(
+                -1, self._num_anchor_per_loc, 1, H, W
+                ).permute(0, 1, 3, 4, 2).contiguous()
+            ret_dict["box_xy_correlation_logits"] = box_xy_correlation
+
         return ret_dict
 
 

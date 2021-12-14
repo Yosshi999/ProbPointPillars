@@ -79,6 +79,7 @@ class VoxelNet(nn.Module):
                  num_groups=32,
                  use_direction_classifier=True,
                  estimate_box_logvariance=False,
+                 estimate_xy_correlation=False,
                  use_sigmoid_score=False,
                  encode_background_as_zeros=True,
                  use_rotate_nms=True,
@@ -120,6 +121,7 @@ class VoxelNet(nn.Module):
         self._encode_background_as_zeros = encode_background_as_zeros
         self._use_direction_classifier = use_direction_classifier
         self._estimate_box_logvariance = estimate_box_logvariance
+        self._estimate_xy_correlation = estimate_xy_correlation
         self._num_input_features = num_input_features
         self._box_coder = target_assigner.box_coder
         self.target_assigner = target_assigner
@@ -168,6 +170,7 @@ class VoxelNet(nn.Module):
             encode_background_as_zeros=encode_background_as_zeros,
             use_direction_classifier=use_direction_classifier,
             estimate_box_logvariance=estimate_box_logvariance,
+            estimate_xy_correlation=estimate_xy_correlation,
             use_groupnorm=use_groupnorm,
             num_groups=num_groups,
             box_code_size=target_assigner.box_coder.code_size,
@@ -246,6 +249,7 @@ class VoxelNet(nn.Module):
         box_preds = preds_dict["box_preds"]
         cls_preds = preds_dict["cls_preds"]
         box_logvar_preds = preds_dict.get("box_logvar_preds", None)
+        box_xy_correlation_logits = preds_dict.get("box_xy_correlation_logits", None)
         batch_size_dev = cls_preds.shape[0]
         box_code_size = self._box_coder.code_size
         self.start_timer("loss forward")
@@ -274,6 +278,7 @@ class VoxelNet(nn.Module):
             reg_targets=reg_targets,
             reg_weights=reg_weights * importance,
             box_logvar_preds=box_logvar_preds,
+            box_xy_correlation_logits=box_xy_correlation_logits,
             num_class=self._num_class,
             encode_rad_error_by_sin=self._encode_rad_error_by_sin,
             encode_background_as_zeros=self._encode_background_as_zeros,
@@ -333,6 +338,8 @@ class VoxelNet(nn.Module):
             res["loc_logvar_preds"] = box_logvar_preds[..., 0:3]
             res["dim_logvar_preds"] = box_logvar_preds[..., 3:6]
             res["rot_logvar_preds"] = box_logvar_preds[..., 6:7]
+        if self._estimate_xy_correlation:
+            res["loc_xy_correlation"] = torch.tanh(box_xy_correlation_logits)
         return res
 
     def network_forward(self, voxels, num_points, coors, batch_size):
@@ -452,6 +459,15 @@ class VoxelNet(nn.Module):
         else:
             batch_box_vars = [None] * batch_size
 
+        if self._estimate_xy_correlation:
+            batch_box_xy_correlation = torch.tanh(
+                preds_dict["box_xy_correlation_logits"].view(
+                    batch_size, -1, 1
+                )
+            )
+        else:
+            batch_box_xy_correlation = [None] * batch_size
+
         predictions_dicts = []
         post_center_range = None
         if len(self._post_center_range) > 0:
@@ -459,12 +475,13 @@ class VoxelNet(nn.Module):
                 self._post_center_range,
                 dtype=batch_box_preds.dtype,
                 device=batch_box_preds.device).float()
-        for box_preds, box_vars, cls_preds, dir_preds, a_mask, meta in zip(
-                batch_box_preds, batch_box_vars, batch_cls_preds, batch_dir_preds,
+        for box_preds, box_vars, box_corr, cls_preds, dir_preds, a_mask, meta in zip(
+                batch_box_preds, batch_box_vars, batch_box_xy_correlation, batch_cls_preds, batch_dir_preds,
                 batch_anchors_mask, meta_list):
             if a_mask is not None:
                 box_preds = box_preds[a_mask]
                 box_vars = box_vars[a_mask]
+                box_corr = box_corr[a_mask]
                 cls_preds = cls_preds[a_mask]
             box_preds = box_preds.float()
             cls_preds = cls_preds.float()
@@ -599,6 +616,7 @@ class VoxelNet(nn.Module):
                     if self._nms_score_thresholds[0] > 0.0:
                         box_preds = box_preds[top_scores_keep]
                         box_vars = box_vars[top_scores_keep]
+                        box_corr = box_corr[top_scores_keep]
                         if self._use_direction_classifier:
                             dir_labels = dir_labels[top_scores_keep]
                         top_labels = top_labels[top_scores_keep]
@@ -626,10 +644,12 @@ class VoxelNet(nn.Module):
                 selected_labels = top_labels[selected]
                 selected_scores = top_scores[selected]
                 selected_vars = box_vars[selected]
+                selected_corr = box_corr[selected]
             # finally generate predictions.
             if selected_boxes.shape[0] != 0:
                 box_preds = selected_boxes
                 box_vars = selected_vars
+                box_corr = selected_corr
                 scores = selected_scores
                 label_preds = selected_labels
                 if self._use_direction_classifier:
@@ -644,6 +664,7 @@ class VoxelNet(nn.Module):
                             box_preds.dtype)
                 final_box_preds = box_preds
                 final_box_vars = box_vars
+                final_box_corr = box_corr
                 final_scores = scores
                 final_labels = label_preds
                 if post_center_range is not None:
@@ -659,6 +680,8 @@ class VoxelNet(nn.Module):
                     }
                     if self._estimate_box_logvariance:
                         predictions_dict["boxvariance_lidar"] = final_box_vars[mask]
+                    if self._estimate_xy_correlation:
+                        predictions_dict["box_xy_correlation"] = final_box_corr[mask]
                 else:
                     predictions_dict = {
                         "box3d_lidar": final_box_preds,
@@ -668,6 +691,8 @@ class VoxelNet(nn.Module):
                     }
                     if self._estimate_box_logvariance:
                         predictions_dict["boxvariance_lidar"] = final_box_vars
+                    if self._estimate_xy_correlation:
+                        predictions_dict["box_xy_correlation"] = final_box_corr
             else:
                 dtype = batch_box_preds.dtype
                 device = batch_box_preds.device
@@ -686,6 +711,12 @@ class VoxelNet(nn.Module):
                 if self._estimate_box_logvariance:
                     predictions_dict["boxvariance_lidar"] = torch.zeros(
                         [0, box_vars.shape[-1]],
+                        dtype=dtype,
+                        device=device
+                    )
+                if self._estimate_xy_correlation:
+                    predictions_dict["box_xy_correlation"] = torch.zeros(
+                        [0, box_corr.shape[-1]],
                         dtype=dtype,
                         device=device
                     )
@@ -783,6 +814,7 @@ def create_loss(loc_loss_ftor,
                 reg_targets,
                 reg_weights,
                 box_logvar_preds,
+                box_xy_correlation_logits,
                 num_class,
                 encode_background_as_zeros=True,
                 encode_rad_error_by_sin=True,
@@ -797,6 +829,8 @@ def create_loss(loc_loss_ftor,
         cls_preds = cls_preds.view(batch_size, -1, num_class + 1)
     if box_logvar_preds is not None:
         box_logvar_preds = box_logvar_preds.view(batch_size, -1, box_code_size)
+    if box_xy_correlation_logits is not None:
+        box_xy_correlation_logits = box_xy_correlation_logits.view(batch_size, -1, 1)
     cls_targets = cls_targets.squeeze(-1)
     one_hot_targets = torchplus.nn.one_hot(
         cls_targets, depth=num_class + 1, dtype=box_preds.dtype)
@@ -813,8 +847,12 @@ def create_loss(loc_loss_ftor,
         loc_losses = loc_loss_ftor(
             box_preds, reg_targets, weights=reg_weights)  # [N, M]
     else:
-        loc_losses = loc_loss_ftor(
-            box_preds, reg_targets, logvars=box_logvar_preds, weights=reg_weights)  # [N, M]
+        if box_xy_correlation_logits is None:
+            loc_losses = loc_loss_ftor(
+                box_preds, reg_targets, logvars=box_logvar_preds, weights=reg_weights)  # [N, M]
+        else:
+            loc_losses = loc_loss_ftor(
+                box_preds, reg_targets, logvars=box_logvar_preds, xy_corr=torch.tanh(box_xy_correlation_logits), weights=reg_weights)  # [N, M]
     cls_losses = cls_loss_ftor(
         cls_preds, one_hot_targets, weights=cls_weights)  # [N, M]
     return loc_losses, cls_losses

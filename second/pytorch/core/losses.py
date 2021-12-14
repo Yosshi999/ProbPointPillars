@@ -197,7 +197,7 @@ class LaplacianKLWithUncertainty(Loss):
     else:
       self._code_weights = None
     self._codewise = codewise
-  def _compute_loss(self, prediction_tensor, target_tensor, logvars=None, weights=None):
+  def _compute_loss(self, prediction_tensor, target_tensor, logvars=None, xy_corr=None, weights=None):
     """Compute loss function.
 
     Args:
@@ -229,6 +229,10 @@ class LaplacianKLWithUncertainty(Loss):
     loss = (logvars - self._log_label_noise) + (
       self._label_noise * torch.exp(-abs_diff / self._label_noise) + abs_diff
     ) * invvars - 1
+    if xy_corr is not None:
+      diff_xy = diff[..., 0:1] * diff[..., 1:2]
+      sigma_xy = torch.exp(0.5 * logvars[..., 0:1] + 0.5 * logvars[..., 1:2]) * xy_corr
+      loss[..., 0:2] += torch.abs(diff_xy - sigma_xy) / 2
 
     if self._codewise:
       anchorwise_smooth_l1norm = loss
@@ -320,7 +324,7 @@ class WeightedSmoothL1LocalizationLossWithUncertainty(WeightedSmoothL1Localizati
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
-  def _compute_loss(self, prediction_tensor, target_tensor, logvars=None, weights=None):
+  def _compute_loss(self, prediction_tensor, target_tensor, logvars=None, xy_corr=None, weights=None):
     """Compute loss function.
 
     Args:
@@ -348,6 +352,11 @@ class WeightedSmoothL1LocalizationLossWithUncertainty(WeightedSmoothL1Localizati
     # add uncertainty loss: 1 / sigma^2 * Loss + 1/2 * log(sigma^2)
     invvars = torch.exp(-logvars)
     loss = invvars * loss + 0.5 * logvars
+
+    if xy_corr is not None:
+      diff_xy = diff[..., 0:1] * diff[..., 1:2]
+      sigma_xy = torch.exp(0.5 * logvars[..., 0:1] + 0.5 * logvars[..., 1:2]) * xy_corr
+      loss[..., 0:2] += torch.abs(diff_xy - sigma_xy) / 2
 
     if self._codewise:
       anchorwise_smooth_l1norm = loss

@@ -62,7 +62,8 @@ message VoxelNet {
   float direction_limit_offset = 23;
 
   bool estimate_box_logvariance = 24;
+  bool estimate_xy_correlation = 25;
 
   // deprecated in future
-  bool lidar_input = 25;
+  bool lidar_input = 26;
 }
