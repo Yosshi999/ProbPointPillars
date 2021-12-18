@@ -354,9 +354,20 @@ class WeightedSmoothL1LocalizationLossWithUncertainty(WeightedSmoothL1Localizati
     loss = invvars * loss + 0.5 * logvars
 
     if xy_corr is not None:
-      diff_xy = diff[..., 0:1] * diff[..., 1:2]
+      sigma_xx = torch.exp(logvars[..., 0:1])
+      sigma_yy = torch.exp(logvars[..., 1:2])
       sigma_xy = torch.exp(0.5 * logvars[..., 0:1] + 0.5 * logvars[..., 1:2]) * xy_corr
-      loss[..., 0:2] += torch.abs(diff_xy - sigma_xy) / 2
+      det = (sigma_xx * sigma_yy) - sigma_xy**2
+      prec_xx = sigma_yy / det
+      prec_xy = -sigma_xy / det
+      prec_yy = sigma_yy / det
+      dx = diff[..., 0:1]
+      dy = diff[..., 1:2]
+      locloss = torch.cat([
+        dx * dx * prec_xx + dx * dy * prec_xy + torch.log(det)/2,
+        dy * dy * prec_yy + dx * dy * prec_xy + torch.log(det)/2,
+      ], -1)
+      loss[..., 0:2] = locloss
 
     if self._codewise:
       anchorwise_smooth_l1norm = loss
