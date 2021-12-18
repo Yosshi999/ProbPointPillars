@@ -397,7 +397,8 @@ def train(config_path,
                     torchplus.train.save_models(model_dir, [net, amp_optimizer],
                                                 net.get_global_step())
                     net.eval()
-                    result_path_step = result_path / f"step_{net.get_global_step()}"
+                    # result_path_step = result_path / f"step_{net.get_global_step()}"
+                    result_path_step = result_path / f"latest"
                     result_path_step.mkdir(parents=True, exist_ok=True)
                     model_logging.log_text("#################################",
                                         global_step)
