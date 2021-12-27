@@ -395,7 +395,7 @@ def train(config_path,
 
                 if global_step % steps_per_eval == 0:
                     torchplus.train.save_models(model_dir, [net, amp_optimizer],
-                                                net.get_global_step())
+                                                net.get_global_step(), max_to_keep=3)
                     net.eval()
                     # result_path_step = result_path / f"step_{net.get_global_step()}"
                     result_path_step = result_path / f"latest"
@@ -440,12 +440,12 @@ def train(config_path,
         model_logging.log_text(str(e), step)
         model_logging.log_text(json.dumps(example["metadata"], indent=2), step)
         torchplus.train.save_models(model_dir, [net, amp_optimizer],
-                                    step)
+                                    step, max_to_keep=3)
         raise e
     finally:
         model_logging.close()
     torchplus.train.save_models(model_dir, [net, amp_optimizer],
-                                net.get_global_step())
+                                net.get_global_step(), max_to_keep=3)
 
 
 def evaluate(config_path,
