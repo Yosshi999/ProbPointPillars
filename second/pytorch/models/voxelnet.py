@@ -480,8 +480,6 @@ class VoxelNet(nn.Module):
                 batch_anchors_mask, meta_list):
             if a_mask is not None:
                 box_preds = box_preds[a_mask]
-                box_vars = box_vars[a_mask]
-                box_corr = box_corr[a_mask]
                 cls_preds = cls_preds[a_mask]
             box_preds = box_preds.float()
             cls_preds = cls_preds.float()
@@ -489,6 +487,12 @@ class VoxelNet(nn.Module):
                 if a_mask is not None:
                     dir_preds = dir_preds[a_mask]
                 dir_labels = torch.max(dir_preds, dim=-1)[1]
+            if self._estimate_box_logvariance:
+                if a_mask is not None:
+                    box_vars = box_vars[a_mask]
+            if self._estimate_xy_correlation:
+                if a_mask is not None:
+                    box_corr = box_corr[a_mask]
             if self._encode_background_as_zeros:
                 # this don't support softmax
                 assert self._use_sigmoid_score is True
@@ -615,10 +619,12 @@ class VoxelNet(nn.Module):
                 if top_scores.shape[0] != 0:
                     if self._nms_score_thresholds[0] > 0.0:
                         box_preds = box_preds[top_scores_keep]
-                        box_vars = box_vars[top_scores_keep]
-                        box_corr = box_corr[top_scores_keep]
                         if self._use_direction_classifier:
                             dir_labels = dir_labels[top_scores_keep]
+                        if self._estimate_box_logvariance:
+                            box_vars = box_vars[top_scores_keep]
+                        if self._estimate_xy_correlation:
+                            box_corr = box_corr[top_scores_keep]
                         top_labels = top_labels[top_scores_keep]
                     boxes_for_nms = box_preds[:, [0, 1, 3, 4, 6]]
                     if not self._use_rotate_nms:
@@ -641,15 +647,15 @@ class VoxelNet(nn.Module):
                 selected_boxes = box_preds[selected]
                 if self._use_direction_classifier:
                     selected_dir_labels = dir_labels[selected]
+                if self._estimate_box_logvariance:
+                    selected_vars = box_vars[selected]
+                if self._estimate_xy_correlation:
+                    selected_corr = box_corr[selected]
                 selected_labels = top_labels[selected]
                 selected_scores = top_scores[selected]
-                selected_vars = box_vars[selected]
-                selected_corr = box_corr[selected]
             # finally generate predictions.
             if selected_boxes.shape[0] != 0:
                 box_preds = selected_boxes
-                box_vars = selected_vars
-                box_corr = selected_corr
                 scores = selected_scores
                 label_preds = selected_labels
                 if self._use_direction_classifier:
@@ -663,8 +669,12 @@ class VoxelNet(nn.Module):
                         6] = dir_rot + self._dir_offset + period * dir_labels.to(
                             box_preds.dtype)
                 final_box_preds = box_preds
-                final_box_vars = box_vars
-                final_box_corr = box_corr
+                if self._estimate_box_logvariance:
+                    box_vars = selected_vars
+                    final_box_vars = box_vars
+                if self._estimate_xy_correlation:
+                    box_corr = selected_corr
+                    final_box_corr = box_corr
                 final_scores = scores
                 final_labels = label_preds
                 if post_center_range is not None:
