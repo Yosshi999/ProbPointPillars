@@ -140,6 +140,96 @@ class WeightedL2LocalizationLoss(Loss):
     square_diff = 0.5 * weighted_diff * weighted_diff
     return square_diff.sum(2)
 
+class WeightedL2LocalizationAndVonMisesLoss(WeightedL2LocalizationLoss):
+  def __init__(self, code_weights=None, codewise=True):
+    super().__init__(code_weights=code_weights)
+    self._codewise = codewise
+
+  def _compute_loss(self, prediction_tensor, target_tensor, weights):
+    """Compute loss function.
+
+    Args:
+      prediction_tensor: A float tensor of shape [batch_size, num_anchors,
+        code_size] representing the (encoded) predicted locations of objects.
+      target_tensor: A float tensor of shape [batch_size, num_anchors,
+        code_size] representing the regression targets
+      weights: a float tensor of shape [batch_size, num_anchors]
+
+    Returns:
+      loss: a float tensor of shape [batch_size, num_anchors] tensor
+        representing the value of the loss function.
+    """
+    diff = prediction_tensor - target_tensor
+    if self._code_weights is not None:
+      self._code_weights = self._code_weights.type_as(prediction_tensor).to(prediction_tensor.device)
+      self._code_weights = self._code_weights.view(1, 1, -1)
+      diff = self._code_weights * diff
+
+    square_diff = 0.5 * diff[...,:6] * diff[...,:6]
+    angular_diff = 1 - torch.cos(diff[..., 6:7])
+
+    loss = torch.cat([square_diff, angular_diff], -1)
+
+    if self._codewise:
+      anchorwise_loss = loss
+      if weights is not None:
+        anchorwise_loss *= weights.unsqueeze(-1)
+    else:
+      anchorwise_loss = torch.sum(loss, 2)
+      if weights is not None:
+        anchorwise_loss *= weights
+    return anchorwise_loss
+
+class WeightedL2LocalizationAndVonMisesLossWithUncertainty(WeightedL2LocalizationLoss):
+  supported = set([LossType.logvariance])
+  def __init__(self, code_weights=None, codewise=True):
+    super().__init__(code_weights=code_weights)
+    self._codewise = codewise
+
+  def _compute_loss(self, prediction_tensor, target_tensor, weights, logvars=None):
+    """Compute loss function.
+
+    Args:
+      prediction_tensor: A float tensor of shape [batch_size, num_anchors,
+        code_size] representing the (encoded) predicted locations of objects.
+      target_tensor: A float tensor of shape [batch_size, num_anchors,
+        code_size] representing the regression targets
+      weights: a float tensor of shape [batch_size, num_anchors]
+
+    Returns:
+      loss: a float tensor of shape [batch_size, num_anchors] tensor
+        representing the value of the loss function.
+    """
+    diff = prediction_tensor - target_tensor
+    if self._code_weights is not None:
+      self._code_weights = self._code_weights.type_as(prediction_tensor).to(prediction_tensor.device)
+      self._code_weights = self._code_weights.view(1, 1, -1)
+      diff = self._code_weights * diff
+    square_diff = 0.5 * diff[...,:6] * diff[...,:6]
+    angular_diff = 1 - torch.cos(diff[..., 6:7])
+
+    # nll_angle = torch.log(torch.i0(m)) - m * torch.cos(prediction_angle - target_angle)
+    #  = torch.log(torch.i0(m)) - m - m * (-1 + torch.cos(prediction_angle - target_angle))
+    #  = torch.log(torch.i0(m)exp(-m)) + m * (1 - torch.cos(prediction_angle - target_angle))
+    # angular_uncloss = torch.log(torch.special.i0e(m))
+    # angular_uncloss += torch.nn.functional.elu(logvars[..., 6:7] - 1.0) # regularization (https://arxiv.org/abs/2011.02553)
+
+    invvars = torch.exp(-logvars)
+    linear_uncloss = 0.5 * logvars[..., :6]
+    angular_uncloss = torch.log(torch.special.i0e(invvars[..., 6:7]))
+
+    loss = invvars * torch.cat([square_diff, angular_diff], -1) + torch.cat([linear_uncloss, angular_uncloss], -1)
+
+    if self._codewise:
+      anchorwise_loss = loss
+      if weights is not None:
+        anchorwise_loss *= weights.unsqueeze(-1)
+    else:
+      anchorwise_loss = torch.sum(loss, 2)
+      if weights is not None:
+        anchorwise_loss *= weights
+    return anchorwise_loss
+
 class WeightedSmoothL1LocalizationLoss(Loss):
   """Smooth L1 localization loss function.
 

@@ -32,8 +32,10 @@ message LocalizationLoss {
     WeightedSmoothL1LocalizationLoss weighted_smooth_l1_with_uncertainty = 4;
     WeightedSmoothL1LocalizationLoss weighted_smooth_l1_and_von_mises_with_uncertainty = 5;
     LaplacianKLWithUncertainty laplacian_kl_with_uncertainty = 6;
+    WeightedL2LocalizationLoss weighted_l2_and_von_mises = 7;
+    WeightedL2LocalizationLoss weighted_l2_and_von_mises_with_uncertainty = 8;
   }
-  bool encode_rad_error_by_sin = 7;
+  bool encode_rad_error_by_sin = 9;
 }
 
 // L2 location loss: 0.5 * ||weight * (a - b)|| ^ 2

@@ -107,6 +107,20 @@ def _build_localization_loss(loss_config) -> losses.Loss:
     else:
       code_weight = config.code_weight
     return losses.WeightedL2LocalizationLoss(code_weight)
+  if loss_type == 'weighted_l2_and_von_mises':
+    config = loss_config.weighted_l2_and_von_mises
+    if len(config.code_weight) == 0:
+      code_weight = None
+    else:
+      code_weight = config.code_weight
+    return losses.WeightedL2LocalizationAndVonMisesLoss(code_weight)
+  if loss_type == 'weighted_l2_and_von_mises_with_uncertainty':
+    config = loss_config.weighted_l2_and_von_mises_with_uncertainty
+    if len(config.code_weight) == 0:
+      code_weight = None
+    else:
+      code_weight = config.code_weight
+    return losses.WeightedL2LocalizationAndVonMisesLoss(code_weight)
   if loss_type == 'weighted_smooth_l1_with_uncertainty':
     config = loss_config.weighted_smooth_l1_with_uncertainty
     if len(config.code_weight) == 0:
