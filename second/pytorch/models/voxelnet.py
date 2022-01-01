@@ -2,6 +2,7 @@ import time
 from enum import Enum
 from functools import reduce
 import contextlib
+from typing import Optional
 import numpy as np
 import torch
 from torch import nn
@@ -9,9 +10,10 @@ from torch.nn import functional as F
 
 import torchplus
 from second.pytorch.core import box_torch_ops
-from second.pytorch.core.losses import (WeightedSigmoidClassificationLoss,
+from second.pytorch.core.losses import (Loss, WeightedSigmoidClassificationLoss,
                                         WeightedSmoothL1LocalizationLoss,
-                                        WeightedSoftmaxClassificationLoss)
+                                        WeightedSoftmaxClassificationLoss,
+                                        LossType)
 from second.pytorch.models import middle, pointpillars, rpn, voxel_encoder
 from torchplus import metrics
 from second.pytorch.utils import torch_timer
@@ -96,8 +98,8 @@ class VoxelNet(nn.Module):
                  direction_loss_weight=1.0,
                  loss_norm_type=LossNormType.NormByNumPositives,
                  encode_rad_error_by_sin=False,
-                 loc_loss_ftor=None,
-                 cls_loss_ftor=None,
+                 loc_loss_ftor: Optional[Loss]=None,
+                 cls_loss_ftor: Optional[Loss]=None,
                  measure_time=False,
                  voxel_generator=None,
                  post_center_range=None,
@@ -815,8 +817,8 @@ def add_sin_difference(boxes1, boxes2, boxes1_rot, boxes2_rot, factor=1.0):
     return boxes1, boxes2
 
 
-def create_loss(loc_loss_ftor,
-                cls_loss_ftor,
+def create_loss(loc_loss_ftor: Loss,
+                cls_loss_ftor: Loss,
                 box_preds,
                 cls_preds,
                 cls_targets,
@@ -853,16 +855,14 @@ def create_loss(loc_loss_ftor,
         box_preds, reg_targets = add_sin_difference(box_preds, reg_targets, box_preds[..., 6:7], reg_targets[..., 6:7],
                                                     sin_error_factor)
 
-    if box_logvar_preds is None:
-        loc_losses = loc_loss_ftor(
-            box_preds, reg_targets, weights=reg_weights)  # [N, M]
-    else:
-        if box_xy_correlation_logits is None:
-            loc_losses = loc_loss_ftor(
-                box_preds, reg_targets, logvars=box_logvar_preds, weights=reg_weights)  # [N, M]
-        else:
-            loc_losses = loc_loss_ftor(
-                box_preds, reg_targets, logvars=box_logvar_preds, xy_corr=torch.tanh(box_xy_correlation_logits), weights=reg_weights)  # [N, M]
+    loc_kwargs = {}
+    if LossType.logvariance in loc_loss_ftor.supported:
+        loc_kwargs["logvars"] = box_logvar_preds
+    if LossType.xy_correlation in loc_loss_ftor.supported:
+        loc_kwargs["xy_corr"] = torch.tanh(box_xy_correlation_logits)
+
+    loc_losses = loc_loss_ftor(
+        box_preds, reg_targets, weights=reg_weights, **loc_kwargs)  # [N, M]
     cls_losses = cls_loss_ftor(
         cls_preds, one_hot_targets, weights=cls_weights)  # [N, M]
     return loc_losses, cls_losses

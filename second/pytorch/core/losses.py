@@ -10,6 +10,8 @@ Classification losses:
  * BootstrappedSigmoidClassificationLoss
 """
 from abc import ABCMeta, abstractmethod
+from enum import Enum
+from typing import Set
 
 import numpy as np
 import torch
@@ -18,6 +20,10 @@ from torch import nn
 from torch.autograd import Variable
 from torch.nn import functional as F
 import torchplus
+
+class LossType(Enum):
+  logvariance = 1
+  xy_correlation = 2
 
 def indices_to_dense_vector(indices,
                             size,
@@ -51,6 +57,7 @@ def indices_to_dense_vector(indices,
 class Loss(object):
   """Abstract base class for loss functions."""
   __metaclass__ = ABCMeta
+  supported: Set[LossType] = set()
 
   def __call__(self,
                prediction_tensor,
@@ -186,6 +193,7 @@ class LaplacianKLWithUncertainty(Loss):
   """KL Divergence between Laplacian distributions.
   From "Learning an Uncertainty-Aware Object Detector for Autonomous Driving," Mayer et al., 2019
   """
+  supported = set([LossType.logvariance, LossType.xy_correlation])
   def __init__(self, label_noise=0.01, code_weights=None, encode_rad_error_by_sin=False, codewise=True):
     super().__init__()
     self._label_noise = label_noise
@@ -253,6 +261,7 @@ class WeightedSmoothL1LocalizationAndVonMisesLossWithUncertainty(WeightedSmoothL
     where I_0 is zeroth order modified Bessel function (torch.i0) and
     m is concentration parameter; m ~ exp(-logvar)
   """
+  supported = set([LossType.logvariance])
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
@@ -321,6 +330,7 @@ class WeightedSmoothL1LocalizationLossWithUncertainty(WeightedSmoothL1Localizati
 
   See also Equation (3) in the Fast R-CNN paper by Ross Girshick (ICCV 2015)
   """
+  supported = set([LossType.logvariance, LossType.xy_correlation])
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 

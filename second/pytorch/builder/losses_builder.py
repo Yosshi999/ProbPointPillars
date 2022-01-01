@@ -83,7 +83,7 @@ def build_faster_rcnn_classification_loss(loss_config):
       logit_scale=config.logit_scale)
 
 
-def _build_localization_loss(loss_config):
+def _build_localization_loss(loss_config) -> losses.Loss:
   """Builds a localization loss based on the loss config.
 
   Args:
@@ -146,7 +146,7 @@ def _build_localization_loss(loss_config):
   raise ValueError('Empty loss config.')
 
 
-def _build_classification_loss(loss_config):
+def _build_classification_loss(loss_config) -> losses.Loss:
   """Builds a classification loss based on the loss config.
 
   Args:
