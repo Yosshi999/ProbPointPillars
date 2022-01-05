@@ -190,9 +190,10 @@ class VoxelNet(nn.Module):
         self.rpn_cls_loss = metrics.Scalar()
         self.rpn_loc_loss = metrics.Scalar()
         self.rpn_total_loss = metrics.Scalar()
-        self.rpn_loc_uncertainty = metrics.Scalar()
-        self.rpn_dim_uncertainty = metrics.Scalar()
-        self.rpn_rot_uncertainty = metrics.Scalar()
+        if self._estimate_box_logvariance:
+            self.rpn_loc_uncertainty = metrics.Scalar()
+            self.rpn_dim_uncertainty = metrics.Scalar()
+            self.rpn_rot_uncertainty = metrics.Scalar()
         self.register_buffer("global_step", torch.LongTensor(1).zero_())
 
         self._time_dict = {}
@@ -741,9 +742,10 @@ class VoxelNet(nn.Module):
         self.rpn_cls_loss.float()
         self.rpn_loc_loss.float()
         self.rpn_total_loss.float()
-        self.rpn_loc_uncertainty.float()
-        self.rpn_dim_uncertainty.float()
-        self.rpn_rot_uncertainty.float()
+        if self._estimate_box_logvariance:
+            self.rpn_loc_uncertainty.float()
+            self.rpn_dim_uncertainty.float()
+            self.rpn_rot_uncertainty.float()
 
     def update_metrics(self, cls_loss, loc_loss, cls_preds, labels, sampled, loc_uncs, dim_uncs, rot_uncs):
         batch_size = cls_preds.shape[0]
@@ -784,9 +786,10 @@ class VoxelNet(nn.Module):
         self.rpn_cls_loss.clear()
         self.rpn_loc_loss.clear()
         self.rpn_total_loss.clear()
-        self.rpn_loc_uncertainty.clear()
-        self.rpn_dim_uncertainty.clear()
-        self.rpn_rot_uncertainty.clear()
+        if self._estimate_box_logvariance:
+            self.rpn_loc_uncertainty.clear()
+            self.rpn_dim_uncertainty.clear()
+            self.rpn_rot_uncertainty.clear()
 
     @staticmethod
     def convert_norm_to_float(net):
