@@ -859,9 +859,9 @@ def create_loss(loc_loss_ftor: Loss,
                                                     sin_error_factor)
 
     loc_kwargs = {}
-    if LossType.logvariance in loc_loss_ftor.supported:
+    if LossType.logvariance in loc_loss_ftor.supported and box_logvar_preds is not None:
         loc_kwargs["logvars"] = box_logvar_preds
-    if LossType.xy_correlation in loc_loss_ftor.supported:
+    if LossType.xy_correlation in loc_loss_ftor.supported and box_xy_correlation_logits is not None:
         loc_kwargs["xy_corr"] = torch.tanh(box_xy_correlation_logits)
 
     loc_losses = loc_loss_ftor(
