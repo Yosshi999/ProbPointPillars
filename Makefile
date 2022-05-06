@@ -16,7 +16,7 @@ endif
 	mkdir -p $(KITTI_DATASET_ROOT)/training/velodyne_reduced && \
 	mkdir -p $(KITTI_DATASET_ROOT)/testing/velodyne_reduced && \
 	docker run --rm -it --gpus all \
-		-v /hdd/kitti:/app/data \
+		-v $(KITTI_DATASET_ROOT):/app/data \
 		-v $(MAKEFILE_DIR)/model:/app/model \
 		$(IMAGE_NAME):latest \
 		python create_data.py kitti_data_prep --root_path=/app/data
@@ -44,7 +44,7 @@ ifndef KITTI_DATASET_ROOT
 endif
 	echo CONF:$(CONF), EXP:$(EXP)
 	docker run --rm -it --gpus all \
-		-v /hdd/kitti:/app/data \
+		-v $(KITTI_DATASET_ROOT):/app/data \
 		-v $(MAKEFILE_DIR)/model:/app/model \
 		$(IMAGE_NAME):latest \
 		python ./pytorch/train.py train \
@@ -77,7 +77,7 @@ ifndef KITTI_DATASET_ROOT
 	exit 1
 endif
 	docker run --rm -it --gpus all \
-		-v /hdd/kitti:/app/data \
+		-v $(KITTI_DATASET_ROOT):/app/data \
 		-v $(MAKEFILE_DIR)/model:/app/model \
 		$(IMAGE_NAME):latest \
 		python ./pytorch/train.py evaluate \
@@ -100,8 +100,12 @@ board:
 BACKEND_PORT := 16666
 .PHONY: viewer
 viewer:
+ifndef KITTI_DATASET_ROOT
+	echo "argument KITTI_DATASET_ROOT is not defined"
+	exit 1
+endif
 	docker run --rm -it --gpus all \
-		-v /hdd/kitti:/app/data \
+		-v $(KITTI_DATASET_ROOT):/app/data \
 		-v $(MAKEFILE_DIR)/model:/app/model \
 		--publish=$(BACKEND_PORT):$(BACKEND_PORT) \
 		$(IMAGE_NAME):latest \
